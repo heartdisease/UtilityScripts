@@ -1,0 +1,319 @@
+#!/bin/bash
+VERSION_CODE_NAME=$(lsb_release -sc)
+## ensure compatibility with linux mint
+if [ "$VERSION_CODE_NAME" == "isadora" ]
+then
+	VERSION_CODE_NAME="lucid"
+elif [ "$VERSION_CODE_NAME" == "julia" ]
+then
+	VERSION_CODE_NAME="maverick"
+elif [ "$VERSION_CODE_NAME" == "katya" ]
+then
+	VERSION_CODE_NAME="natty"
+elif [ "$VERSION_CODE_NAME" == "lisa" ]
+then
+	VERSION_CODE_NAME="oneiric"
+elif [ "$VERSION_CODE_NAME" == "olivia" ]
+then
+	VERSION_CODE_NAME="raring"
+elif [ "$(lsb_release -si)" != "Ubuntu" ]
+then
+	echo "Your operating system is not supported"
+	exit 1
+fi
+
+# this function is only used by add_repositories()
+function add_ppa() {
+	# PPA for wine
+	add-apt-repository -y ppa:ubuntu-wine/ppa
+	# PPA for VLC player
+	add-apt-repository -y ppa:videolan/stable-daily
+	# PPA for GTK+ themes (WebUpd8)
+	add-apt-repository -y ppa:webupd8team/themes
+	# PPA for Guayadeque media player
+	add-apt-repository -y ppa:anonbeat/guayadeque
+	# PPA for ffmpeg
+	add-apt-repository -y ppa:jon-severinsson/ffmpeg
+}
+
+# this function is only used by add_repositories()
+function add_apt_keys() {
+	# key for VideoLAN repository
+	wget -O - http://download.videolan.org/pub/debian/videolan-apt.asc | apt-key add -
+	# key for TOR
+	gpg --keyserver keys.gnupg.net --recv 886DDD89
+	gpg --export A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89 | apt-key add -
+	#probably the same: apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 886DDD89
+	# key for GetDeb
+	#wget -q -O- http://archive.getdeb.net/getdeb-archive.key | sudo apt-key add -
+	# key for VirtualBox
+	wget -q http://download.virtualbox.org/virtualbox/debian/oracle_vbox.asc -O- | sudo apt-key add -
+}
+
+function add_apt_sources() {
+   apt_sources="/etc/apt/sources.list"
+	
+	echo >> $apt_sources
+	echo "# libdvdcss2 REPO" >> $apt_sources
+	echo "deb http://download.videolan.org/pub/debian/stable/ /" >> $apt_sources
+	echo "deb-src http://download.videolan.org/pub/debian/stable/ /" >> $apt_sources
+	#echo >> $apt_sources
+	#echo "# GETDEB" >> $apt_sources
+	#echo "deb http://archive.getdeb.net/ubuntu $VERSION_CODE_NAME-getdeb apps" >> $apt_sources
+	echo >> $apt_sources
+	echo "# TOR" >> $apt_sources
+	echo "deb http://deb.torproject.org/torproject.org $VERSION_CODE_NAME main" >> $apt_sources
+	echo >> $apt_sources
+	echo "# VIRTUALBOX" >> $apt_sources
+	echo "deb http://download.virtualbox.org/virtualbox/debian $VERSION_CODE_NAME contrib" >> $apt_sources
+	echo >> $apt_sources
+}
+
+# this function has to be called as root!
+function add_repositories() {
+	add_apt_sources
+	add_apt_keys
+	add_ppa
+}
+
+function install_nvidia() {
+	until [ "$k" == "y" -o "$k" == "n" ]
+	do
+		read -p "Do you want to install the latest nVidia drivers? [y/n]: " k
+	done
+	
+	if [ $k == "y" ]
+	then
+		echo "Install nVidia drivers ..."
+		apt-get -y install nvidia-current
+	else
+		echo "Do not install nVidia drivers."
+	fi
+}
+
+# install all media codecs for gstreamer + mozilla plugin
+function install_mediacodecs() {
+	apt-get -y install mozplugger totem-mozilla ubuntu-restricted-extras
+}
+
+function install_os_essentials() {
+	apt-get -y install nautilus-open-terminal bluebird-gtk-theme libreoffice-gtk3 libreoffice-pdfimport libreoffice-ogltrans libreoffice-presenter-console libreoffice-presentation-minimizer libreoffice-writer2latex texlive-latex-base
+}
+
+# install different useful tools
+function install_misc() {
+	# remove unused components
+	#apt-get -y remove empathy gwibber openjdk-6-jre openjdk-6-jre-headless
+	apt-get -y install wine rar p7zip inkscape gimp gthumb filezilla pidgin kanjipad vlc ttf-sil-gentium msttcorefonts gparted optipng
+}
+
+# install module for writing japanese
+function install_anthy() {
+	apt-get -y install anthy ibus-anthy language-pack-ja language-pack-ja-base language-pack-gnome-ja-base language-pack-gnome-ja language-support-fonts-ja language-support-input-ja
+}
+
+function install_gnomeshell() {
+	install_nvidia
+	apt-get -y install gnome-shell gnome-tweak-tool gnome-clocks
+}
+
+## Installs the original java (v7)
+## Tutorial from http://www.wikihow.com/Install-Oracle-Java-on-Ubuntu-Linux
+function install_oracle_java()
+{
+	if [ ! -f "jre-7u1-linux-x64.tar.gz" ]
+	then
+		echo "Please download Java from oracle homepage first"
+		firefox --new-tab http://www.oracle.com/technetwork/java/javase/downloads/index.html
+		exit
+	fi
+	
+	mkdir /usr/local/java
+	tar -xf "jre-7u1-linux-x64.tar.gz" -C /usr/local/java
+	
+	echo "JAVA_HOME=/usr/local/java/jre1.7.0_01" >> /etc/profile
+	echo "JAVA_BIN=\$JAVA_HOME/bin" >> /etc/profile
+	echo "PATH=\$PATH:\$JAVA_HOME/bin" >> /etc/profile
+	echo "export JAVA_HOME" >> /etc/profile
+	echo "export JAVA_BIN" >> /etc/profile
+	echo "export PATH" >> /etc/profile
+	
+	. /etc/profile # execute profile script
+	
+	# Inform system where Oracle Java JRE is located
+	update-alternatives --install "/usr/bin/java" "java" "$JAVA_BIN/java" 1
+	# Inform system, that Oracle Java JRE must be the default Java
+	update-alternatives --set "java" "$JAVA_BIN/java"
+	
+	# Install Java-plugin into firefox browser
+	ln -s "$JAVA_HOME/lib/amd64/libnpjp2.so" "/usr/lib/firefox/plugins"
+	
+	## @ user: change java.java_plugin_library_name to libnpjp2 in about:config!
+}
+
+## install and configure Tor anonymization service
+function install_tor() {
+	# install tor and polipo (proxy server)
+	apt-get -y install tor tor-geoipdb polipo
+	# create Polipo configuration file
+	mv /usr/lib/polipo/polipo-control /usr/lib/polipo/polipo-control~
+	sed -r "s/DAEMON_OPTS=(.*) LogFile=\\\$LOGFILE/DAEMON_OPTS=\1/" /usr/lib/polipo/polipo-control~ > /usr/lib/polipo/polipo-control
+	echo "logSyslog = false" >> /etc/polipo/config
+	echo "logFile = \"/dev/null\"" >> /etc/polipo/config
+	echo "socksParentProxy = \"127.0.0.1:9050\"" >> /etc/polipo/config
+	echo "socksProxyType = socks5" >> /etc/polipo/config
+	# restart Polipo
+	/etc/init.d/polipo restart
+	
+	## remove tor and polipo from autostart
+	update-rc.d tor disable
+	update-rc.d polipo disable
+}
+
+function libreoffice_setup() {
+   # Add tango color palette to OpenOffice.org
+	if [ ! -f "Tango-Palette.gpl" ]
+	then
+		wget http://tango.freedesktop.org/static/cvs/tango-art-tools/palettes/Tango-Palette.gpl
+	fi
+	
+	ooo_conf_dir="$HOME/.libreoffice/3/user/config"
+	standard_soc="$ooo_conf_dir/standard.soc"
+	standard_soc_bak="$ooo_conf_dir/standard.soc.bak"
+	
+	if [ ! -d $ooo_conf_dir ]
+	then
+		echo "Cannot find LibreOffice configuration."
+		echo "Try to open LibreOffice first ..."
+		
+		soffice --nolockcheck
+		
+		i=0
+		while [ $i -lt 5 ] && [ ! -d $ooo_conf_dir ]
+		do
+			if [ i == 0 ]
+			then
+				echo "Wait 4 seconds for LibreOffice ..."
+			else
+				echo "Wait 4 seconds again ... ($i. time)"
+			fi
+			
+			sleep 4
+			i=$[$i+1]
+			
+			if [ $i == 5 ]
+			then
+				echo "LibreOffice does not react as expected."
+				echo "Please try to start LibreOffice manually and start this script again."
+				exit
+			fi
+		done
+	fi
+	
+	mv $standard_soc $standard_soc_bak # create backup file
+	head -n 3 $standard_soc_bak > $standard_soc
+	
+	IFS=$'\n'
+	tango_palette=$(cat "Tango-Palette.gpl")
+	for line in $tango_palette
+	do
+		if [ ! -z $(echo $line | grep -o "^[0-9 ]") ]; then
+			hex_codes=$(echo "obase=16;"$(echo $line | grep -oE "([0-9]+)[[:space:]]+([0-9]+)[[:space:]]+([0-9]+)" | sed -r "s/[[:space:]]+/;/g") | bc)
+			tango_name=$(echo $line | grep -oE "[A-Za-z0-9 ]+$")
+			
+			echo -n " <draw:color draw:name=\"$tango_name\" draw:color=\"#" >> $standard_soc
+			
+			for hex in $hex_codes; do
+				echo -n $(echo $hex | sed -r "s/^([0-9A-F])$/0\1/") >> $standard_soc
+			done
+			
+			echo "\"/>" >> $standard_soc
+		fi
+	done
+	unset IFS
+	
+	cat $standard_soc_bak | grep "<draw" >> $standard_soc # retrieve all color entries from original file
+	tail -n 1 $standard_soc_bak >> $standard_soc
+}
+
+function disable_bluetooth() {
+	# create backup file
+	mv /etc/rc.local /etc/rc.local.bak
+	# generate new rc.local
+	cat /etc/rc.local.bak | sed "s/^exit 0$/rfkill block bluetooth\n\nexit 0/" > /etc/rc.local
+	# make script executable
+	chmod +x /etc/rc.local
+}
+
+function install_network_ext() {
+	apt-get -y install network-manager-openconnect network-manager-openconnect-gnome network-manager-openvpn network-manager-openvpn-gnome network-manager-vpnc network-manager-vpnc-gnome
+}
+
+function set_configuration() {
+	# deactivate button bar and set editable adress bar as default
+	#gconftool-2 --set /apps/nautilus/preferences/always_use_location_entry --type bool 1
+	
+	# activate d'n'd in window lists (bug in 11.04, obsolete since 11.10)
+	# found @ https://bbs.archlinux.org/viewtopic.php?pid=857482#p857482
+	#gconftool-2 -s -t boolean /apps/metacity/general/compositing_manager true
+	
+	# create truetype font directory (needs super user rights)
+	sudo mkdir -m 744 /usr/share/fonts/truetype/ttf-extra
+	
+	#libreoffice_setup
+}
+
+function full_setup() {
+	#disable_bluetooth
+	#add_repositories
+	apt-get update
+	
+	# install aptitude if it's not already installed
+	if [ ! -f "/usr/bin/aptitude" ]
+	then
+		apt-get -y install aptitude
+	fi
+	
+	#install_gnomeshell
+	install_os_essentials
+	install_mediacodecs
+	install_misc
+	install_anthy # install japanese extensions
+	install_network_ext # install network-manager extensions for mint
+
+	apt-get --force-yes -y dist-upgrade # update packages
+}
+
+function check_root() {
+   if [ "$USERNAME" != "root" ]
+	then
+		echo "You have to be root! Abort."
+		exit 1
+	fi
+}
+
+## CHECK COMMANDLINE ARGS ##
+if [ "$1" == "--full-setup" ]
+then
+	check_root
+	full_setup
+	echo "Ubuntu setup is done."
+elif [ "$1" == "--set-config" ]
+then
+	set_configuration
+elif [ "$1" == "--install-tor" ]
+then
+	check_root
+	install_tor
+elif [ "$1" == "--install-java" ]
+then
+	install_oracle_java
+else	
+	echo "Wrong parameters!"
+	echo
+	echo "Usage: ubuntusetup [OPTION]"
+	echo "	--full-setup	-	Installs and configures several components for a fresh installation"
+	echo "	--install-java	-	Installs Oracle Java (not recommended)"
+	echo "	--set-config	-	Sets a useful basic configuration (only execute for target user - no root)"
+	echo "	--install-tor	-	Installs and configures Tor+Polipo (execute --full-setup first)"
+fi
