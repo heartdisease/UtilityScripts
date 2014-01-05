@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+import re
+import os
+import sys
+
+time_format = '{0}:{1}:{2},{3}'
+time_splitter = re.compile(r'[:|,]')
+time_regex = re.compile(r'[0-9]+:[0-9]+:[0-9]+,[0-9]+')
+
+class time:
+	def __init__(self, time_str):
+		values = time_splitter.split(time_str)
+		self.hour = int(values[0])
+		self.minute = int(values[1])
+		self.second = int(values[2])
+		self.msecond = int(values[3])
+	#end def
+	
+	def sub(self, t):
+		raise Exception('Not implemented!')
+	#end def
+	
+	def add(self, t):
+		total = self.msecond + t.msecond
+		self.msecond = total % 1000
+		if total >= 1000:
+			self.second += 1
+		#endif
+		
+		total = self.second + t.second
+		self.second = total % 60
+		if total >= 60:
+			self.minute += 1
+		#endif
+		
+		total = self.minute + t.minute
+		self.minute = total % 60
+		if total >= 60:
+			self.hour += 1
+		#endif
+	#end def
+	
+	def str(self):
+		return time_format.format(
+			str(self.hour).zfill(2),
+			str(self.minute).zfill(2),
+			str(self.second).zfill(2),
+			str(self.msecond).zfill(3)
+		)
+	#end def
+#end class
+
+class subtitle:
+	def __init__(self, index = None, start_time = None, end_time = None, text = ''):
+		self.index = index
+		self.start_time = start_time
+		self.end_time = end_time
+		self.text = text
+	#end def
+#end class
+
+def read_srt(filename):
+	subs = []
+	with open(filename, 'r') as f:
+		sub = subtitle()
+	
+		for line in f:
+			if len(line.strip()) > 0: # check if current line is a gap
+				if sub.index == None:
+					sub.index = int(line)
+				elif sub.start_time == None:
+					duration = line.split(' --> ')
+					sub.start_time = time(duration[0])
+					sub.end_time = time(duration[1])
+				else:
+					sub.text += line
+				#end if
+			elif len(sub.text) > 0: # if current line is no gap, append line to sub text
+				subs.append(sub)
+				sub = subtitle()
+			#end if
+		#end for
+	#end with
+	return subs
+#end def
+
+def print_subtitle(sub):
+	print(sub.index)
+	print(sub.start_time.str() + ' --> ' + sub.end_time.str())
+	print(sub.text)
+	#print
+#end def
+
+def lshift_subs(subs, t):
+	for sub in subs:
+		sub.start_time.sub(t)
+		sub.end_time.sub(t)
+	
+		print_subtitle(sub)
+	#end for
+#end def
+
+def rshift_subs(subs, t):
+	for sub in subs:
+		sub.start_time.add(t)
+		sub.end_time.add(t)
+	
+		print_subtitle(sub)
+	#end for
+#end def
+
+def strech_subs(subs, t):
+	for sub in subs:
+		sub.end_time.add(t)
+	
+		print_subtitle(sub)
+	#end for
+#end def
+
+### main: ###
+if len(sys.argv) != 4:
+	print("Invalid arguments!")
+	print("Usage: srttools [+|-|:] [hh:mm:ss,ms] [input file]")
+else:
+	t = None
+	mode = sys.argv[1]
+	input_file = sys.argv[3]
+	if time_regex.match(sys.argv[2]):
+		t = time(sys.argv[2])
+	else:
+		print("Invalid time format!")
+		exit(1)
+	#end if
+	if not os.path.exists(input_file):
+		print("Input file does not exist!")
+		exit(1)
+	#endif
+	
+	if mode == '+':
+		rshift_subs(read_srt(input_file), t)
+	elif mode == '-':
+		lshift_subs(read_srt(input_file), t)
+	elif mode == ':':
+		strech_subs(read_srt(input_file), t)
+	else:
+		print("Invalid mode!")
+		exit(1)
+	#end if
+#end if
