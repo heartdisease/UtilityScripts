@@ -121,8 +121,12 @@ class Wordanalyzer:
 	READER = CsvReader(CSV_SEPARATOR, TEXT_DELIMITER)
 	STD_HEADERS = {
 		'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36',
-		'Accept-Language' : 'es-419,es;q=0.8,de;q=0.6,en;q=0.4',
-		'Cookie' : 'id=2253b1a1d20100be||t=1383347694|et=730|cs=002213fd4836496f4f33eeffb7'
+		'Accept-Language' : 'es-419,es'
+	}
+	POST_HEADERS = {
+		'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36',
+		'Accept-Language' : 'es-419,es',
+		'Content-type' : 'application/x-www-form-urlencoded; charset=utf-8'
 	}
 	
 	##
@@ -133,7 +137,10 @@ class Wordanalyzer:
 	##
 	@staticmethod
 	def get_translation(word):
-		word = word.encode('utf-8')
+		# normalize input
+		slash_index = word.find('/') # in case of 'el/la' pair, remove 'el/' to avoid problems with search engine
+		word = word.encode('utf-8') if slash_index == -1 else word[slash_index + 1:].encode('utf-8')
+		
 		url = u'http://www.spanishdict.com/translate/' + urllib.quote(word)
 		normalized  = None
 		translation = None
@@ -149,11 +156,12 @@ class Wordanalyzer:
 			translation  = result_block.find('h2.quick_def').text()
 			wordtype     = result_block.find('div.hw-block > span.quick_pos').text()
 			partofspeach = result_block.find('span.part_of_speech:first-child').text()
-	
+			
+			is_masculine = False
+			is_feminine  = False
+			
 			if partofspeach != None:
 				partofspeach = partofspeach.strip() # remove trailing white spaces
-				is_masculine = False
-				is_feminine  = False
 		
 				if wordtype == None or len(wordtype) == 0:
 					is_probably_noun = u'noun' in partofspeach
@@ -173,26 +181,95 @@ class Wordanalyzer:
 				else:
 					wordtype = wordtype.strip() # remove trailing white spaces
 				#end if
+			#end if
 			
-				if wordtype == u'noun':
-					is_masculine = u'masculine' in partofspeach
-					is_feminine  = u'feminine' in partofspeach
+			if wordtype == u'noun':
+				is_masculine = u'masculine' in partofspeach
+				is_feminine  = u'feminine' in partofspeach
+				
+				# head_word offers more detailed description of the noun (like 'chico, -a')
+				head_word = result_block.find('span.head_word').text()
+				if head_word != None and len(head_word) > 0:
+					normalized = head_word.strip()
 				#end if
-			
-				# !!test case!! la atleta
-			
+				
 				if is_masculine and is_feminine:
 					normalized = u'el/la ' + normalized
 				elif is_masculine:
 					normalized = u'el ' + normalized
 				elif is_feminine:
 					normalized = u'la ' + normalized
+				else: # special case where gender declaration is missing
+					normalized = u'?? ' + normalized
 				#end if
 			#end if
 	
 			if translation != None:
 				translation = translation.replace(';', ',').replace(' , ', ', ')
 			#end if
+		except UnicodeDecodeError, e:
+			print(u'Invalid response for "' + unicode(word, 'utf-8') + '": ' + str(e))
+		#end try
+	
+		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
+	#end def
+	
+	##
+	# Returns a dictionary that contains the normalized version of the word, the translation and the word type (e.g. noun).
+	# 
+	# @param word to be looked up on diccionario-ingles.info
+	# @return dictionary with information about the word
+	##
+	@staticmethod
+	def get_translation_2(word):
+		# normalize input
+		slash_index = word.find('/') # in case of 'el/la' pair, remove 'el/' to avoid problems with search engine
+		word = word.encode('utf-8') if slash_index == -1 else word[slash_index + 1:].encode('utf-8')
+		
+		url = u'http://www.diccionario-ingles.info/index.php' #?search=' + urllib2.quote(word)
+		normalized  = None
+		translation = None
+		wordtype    = None
+		
+		response = urllib2.urlopen(urllib2.Request(url, u'search=' + str(word), Wordanalyzer.POST_HEADERS))
+		try:
+			content = unicode(response.read(), 'latin-1').replace('\n', ' ')
+			p = pq(url=None, opener=lambda url: content)
+			
+			normalized  = None
+			translation = None
+			wordtype    = None
+			
+			info_rows = p('tr[id^="row_"] > td:first-child a')
+			spanish_rows = p('tr[id^="row_"] > td:nth-child(2)')
+			english_rows = p('tr[id^="row_"] > td:nth-child(3)')
+			
+			for i in range(len(spanish_rows)):
+				spanish_row = pq(spanish_rows[i]).text()
+				
+				if normalized == None:
+					if word in spanish_row:
+						word_info = pq(info_rows[i]).attr('onmouseover')
+						wordtype_match = re.match(r"showinfomenu\([0-9]+,'ES','es_en',this,'\w+','[0-9]+',[0-9]+,'\w+','(\w+)'", word_info)
+						
+						if wordtype_match != None:
+							wordtype = wordtype_match.group(1)
+						normalized = spanish_row
+					else:
+						break # no translation found
+					#end if
+				elif spanish_row == normalized:
+					english_row = pq(english_rows[i]).text()
+					
+					if translation == None:
+						translation = english_row
+					else:
+						translation += ', ' + english_row
+					#end if
+				else:
+					break # found all translations
+				#end if
+			#end for
 		except UnicodeDecodeError, e:
 			print(u'Invalid response for "' + unicode(word, 'utf-8') + '": ' + str(e))
 		#end try
@@ -263,7 +340,7 @@ class Wordanalyzer:
 			if len(row) < 2:
 				print('Skip incomplete row')
 			else:
-				p = Processable(lambda word: Wordanalyzer.get_translation(word), row[0], row)
+				p = Processable(lambda word: Wordanalyzer.get_translation(row[0]), row[0], row)
 				p.start()
 				
 				thread_pool.add(p)
@@ -302,6 +379,11 @@ def main(argv):
 		print('wordanalyzer [option] [inputfile] [outputfile]')
 		print('\t--wordlist\tprints list of words contained in [file]')
 		print('\t--check-csv\tprints enhanced version of cvs file [file]')
+		
+		#word = u'el/la líder'
+		#print(word)
+		#print(Wordanalyzer.get_translation_2(word))
+		
 		exit(1)
 	#end if
 
