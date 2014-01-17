@@ -75,35 +75,30 @@ class Processable:
 #end class
 
 class ThreadPool:
+	POOL_SIZE = 8
+
 	def __init__(self, process):
-		self.pool1 = []
-		self.pool2 = []
+		self.pool = []
 		self.process = process
 	#end def
 	
 	def add(self, processable):
-		if len(self.pool1) == 4: # thread pool 1 is full
-			if len(self.pool2) == 4: # both thread pools are full - execute all
-				self.__process_thread_pool(self.pool1)
-				self.__process_thread_pool(self.pool2)
-			else: # thread pool 2 is not full yet
-				self.pool2.append(processable)
-			#end if
-		else: # thread pool 1 is not full yet
-			self.pool1.append(processable)			
+		self.pool.append(processable)
+		
+		if len(self.pool) == ThreadPool.POOL_SIZE: 
+			self.__process_thread_pool()
 		#end if
 	#end def
 	
 	def finish(self):
-		self.__process_thread_pool(self.pool1)
-		self.__process_thread_pool(self.pool2)
+		self.__process_thread_pool()
 	#end def
 	
-	def __process_thread_pool(self, pool):
-		for thread in pool:
-			self.process(thread.result(), thread.row)
+	def __process_thread_pool(self):
+		for thread in self.pool:
+			self.process(thread.result(), thread.row) # thread.result() is a blocking call
 		#end for
-		del pool[:] # clear thread pool
+		del self.pool[:] # clear thread pool
 	#end def
 #end class
 
@@ -156,6 +151,7 @@ class Wordanalyzer:
 			translation  = result_block.find('h2.quick_def').text()
 			wordtype     = result_block.find('div.hw-block > span.quick_pos').text()
 			partofspeach = result_block.find('span.part_of_speech:first-child').text()
+			head_word    = result_block.find('div.dictionary_word > span.head_word').text()
 			
 			is_masculine = False
 			is_feminine  = False
@@ -183,24 +179,27 @@ class Wordanalyzer:
 				#end if
 			#end if
 			
+			# head_word offers more detailed description of the noun (like 'chico, -a')
+			if head_word != None and len(head_word) > 0:
+				normalized = head_word.strip()
+			#end if
+			
 			if wordtype == u'noun':
-				is_masculine = u'masculine' in partofspeach
-				is_feminine  = u'feminine' in partofspeach
-				
-				# head_word offers more detailed description of the noun (like 'chico, -a')
-				head_word = result_block.find('span.head_word').text()
-				if head_word != None and len(head_word) > 0:
-					normalized = head_word.strip()
-				#end if
-				
-				if is_masculine and is_feminine:
-					normalized = u'el/la ' + normalized
-				elif is_masculine:
-					normalized = u'el ' + normalized
-				elif is_feminine:
-					normalized = u'la ' + normalized
-				else: # special case where gender declaration is missing
+				if partofspeach == None: # special case where gender declaration is missing
 					normalized = u'?? ' + normalized
+				else:
+					is_masculine = u'masculine' in partofspeach
+					is_feminine  = u'feminine' in partofspeach
+				
+					if is_masculine and is_feminine:
+						normalized = u'el/la ' + normalized
+					elif is_masculine:
+						normalized = u'el ' + normalized
+					elif is_feminine:
+						normalized = u'la ' + normalized
+					else: # special case where gender declaration is missing
+						normalized = u'?? ' + normalized
+					#end if
 				#end if
 			#end if
 	
@@ -211,7 +210,7 @@ class Wordanalyzer:
 			print(u'Invalid response for "' + unicode(word, 'utf-8') + '": ' + str(e))
 		#end try
 	
-		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
+		return { 'normalized' : normalized if normalized != None else unicode(word, 'utf-8'), 'translation' : translation, 'wordtype' : wordtype }
 	#end def
 	
 	##
@@ -264,7 +263,7 @@ class Wordanalyzer:
 					if translation == None:
 						translation = english_row
 					else:
-						translation += ', ' + english_row
+						translation += u', ' + english_row
 					#end if
 				else:
 					break # found all translations
