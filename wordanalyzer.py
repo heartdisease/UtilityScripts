@@ -103,6 +103,8 @@ class ThreadPool:
 #end class
 
 class Wordanalyzer:
+	PRESENT_TENSE = 3
+
 	CSV_SEPARATOR = ','
 	TEXT_DELIMITER = '"'
 	WORD_SPLIT_REGEX = ur'[ \t-\.,:;!\?\(\)"\'“”]'
@@ -124,6 +126,26 @@ class Wordanalyzer:
 		'Content-type' : 'application/x-www-form-urlencoded; charset=utf-8'
 	}
 	
+	@staticmethod
+	def get_content_from_url(url, encoding = 'utf-8', headers = STD_HEADERS):
+		response = urllib2.urlopen(urllib2.Request(url, headers=headers))
+		
+		try:
+			return unicode(response.read(), encoding).replace('\n', ' ')
+		except UnicodeDecodeError, e:
+			print(str(e))
+		#end try
+		
+		return None
+	#end def
+	
+	@staticmethod
+	def normalize_word(word):
+		word = word.replace('el/la', 'el').replace('o, -a', 'o')
+		slash_index = word.find('/') # in case of 'el/la' pair, remove '/la' to avoid problems with search engine
+		return word.encode('utf-8') if slash_index == -1 else word[slash_index + 1:].encode('utf-8')
+	#end def
+	
 	##
 	# Returns a dictionary that contains the normalized version of the word, the translation and the word type (e.g. noun).
 	# 
@@ -131,19 +153,15 @@ class Wordanalyzer:
 	# @return dictionary with information about the word
 	##
 	@staticmethod
-	def get_translation(word):
-		# normalize input
-		slash_index = word.find('/') # in case of 'el/la' pair, remove 'el/' to avoid problems with search engine
-		word = word.encode('utf-8') if slash_index == -1 else word[slash_index + 1:].encode('utf-8')
-		
+	def get_translation_es(word):
+		word = Wordanalyzer.normalize_word(word)
 		url = u'http://www.spanishdict.com/translate/' + urllib.quote(word)
 		normalized  = None
 		translation = None
 		wordtype    = None
 		
-		response = urllib2.urlopen(urllib2.Request(url, headers=Wordanalyzer.STD_HEADERS))
-		try:
-			content = unicode(response.read(), 'utf-8').replace('\n', ' ')
+		content = Wordanalyzer.get_content_from_url(url)
+		if content != None:
 			p = pq(url=None, opener=lambda url: content)
 	
 			result_block = p('div.results-block')
@@ -206,9 +224,9 @@ class Wordanalyzer:
 			if translation != None:
 				translation = translation.replace(';', ',').replace(' , ', ', ')
 			#end if
-		except UnicodeDecodeError, e:
-			print(u'Invalid response for "' + unicode(word, 'utf-8') + '": ' + str(e))
-		#end try
+		else:
+			print(u'Invalid response for "' + unicode(word, 'utf-8') + '".')
+		#end if
 	
 		return { 'normalized' : normalized if normalized != None else unicode(word, 'utf-8'), 'translation' : translation, 'wordtype' : wordtype }
 	#end def
@@ -220,19 +238,15 @@ class Wordanalyzer:
 	# @return dictionary with information about the word
 	##
 	@staticmethod
-	def get_translation_2(word):
-		# normalize input
-		slash_index = word.find('/') # in case of 'el/la' pair, remove 'el/' to avoid problems with search engine
-		word = word.encode('utf-8') if slash_index == -1 else word[slash_index + 1:].encode('utf-8')
-		
-		url = u'http://www.diccionario-ingles.info/index.php' #?search=' + urllib2.quote(word)
+	def get_translation_es_2(word):
+		word = Wordanalyzer.normalize_word(word)		
+		url = u'http://www.diccionario-ingles.info/index.php?search=' + urllib2.quote(word)
 		normalized  = None
 		translation = None
 		wordtype    = None
 		
-		response = urllib2.urlopen(urllib2.Request(url, u'search=' + str(word), Wordanalyzer.POST_HEADERS))
-		try:
-			content = unicode(response.read(), 'latin-1').replace('\n', ' ')
+		content = Wordanalyzer.get_content_from_url(url, 'latin-1')
+		if content != None:
 			p = pq(url=None, opener=lambda url: content)
 			
 			normalized  = None
@@ -269,11 +283,39 @@ class Wordanalyzer:
 					break # found all translations
 				#end if
 			#end for
-		except UnicodeDecodeError, e:
-			print(u'Invalid response for "' + unicode(word, 'utf-8') + '": ' + str(e))
-		#end try
+		else:
+			print(u'Invalid response for "' + unicode(word, 'utf-8') + '".')
+		#end if
 	
 		return { 'normalized' : normalized, 'translation' : translation, 'wordtype' : wordtype }
+	#end def
+	
+	@staticmethod
+	def get_conjugation_es(verb, tense):
+		verb = verb.encode('utf-8')
+		url = u'http://dix.osola.com/v.php?search=' + urllib2.quote(verb)
+		
+		content = Wordanalyzer.get_content_from_url(url, 'latin-1')
+		if content != None:
+			p = pq(url=None, opener=lambda url: content)
+			
+			table_headers = p('td.contentheadcenter')
+			conjugation_table = p(table_headers[tense]).parent().parent()
+			conjugation_cells = conjugation_table.find('td:last-child')
+			
+			conjugations = None
+			
+			for cell in conjugation_cells:
+				if conjugations == None: # skip first line
+					conjugations = []
+				else:
+					conjugations.append(p(cell).text())
+			#end for
+			
+			return conjugations
+		#end if
+		
+		return None
 	#end def
 	
 	def __init__(self, src, ostream):
@@ -314,7 +356,7 @@ class Wordanalyzer:
 		
 			self.print_csv_row(['[Original word]', '[Normalized form]', '[Translation]', '[Word type]']) # print header
 			for word in words:
-				p = Processable(lambda word: Wordanalyzer.get_translation(word), word, [word])
+				p = Processable(lambda word: Wordanalyzer.get_translation_es(word), word, [word])
 				p.start()
 				
 				thread_pool.add(p)
@@ -339,7 +381,7 @@ class Wordanalyzer:
 			if len(row) < 2:
 				print('Skip incomplete row')
 			else:
-				p = Processable(lambda word: Wordanalyzer.get_translation(row[0]), row[0], row)
+				p = Processable(lambda word: Wordanalyzer.get_translation_es(row[0]), row[0], row)
 				p.start()
 				
 				thread_pool.add(p)
@@ -381,7 +423,9 @@ def main(argv):
 		
 		#word = u'el/la líder'
 		#print(word)
-		#print(Wordanalyzer.get_translation_2(word))
+		#print(Wordanalyzer.get_translation_es_2(word))
+		
+		print(Wordanalyzer.get_conjugation_es('comprender', Wordanalyzer.PRESENT_TENSE))
 		
 		exit(1)
 	#end if
