@@ -103,8 +103,36 @@ class ThreadPool:
 #end class
 
 class Wordanalyzer:
-	PRESENT_TENSE = 3
+	#(0, 'Formas basicas')
+	#(1, 'Imperativo')
+	#(2, 'negativo')
+	#(3, 'Presente')
+	#(4, u'Pret\xe9rito perfecto')
+	#(5, u'Pret\xe9rito imperfecto')
+	#(6, u'Pret\xe9rito pluscuamperfecto')
+	#(7, u'Pret\xe9rito indefinido')
+	#(8, u'Pret\xe9rito anterior')
+	#(9, 'Futuro imperfecto')
+	#(10, 'Futuro perfecto')
+	#(11, 'Condicional simple')
+	#(12, 'Condicional compuesto')
+	#(13, 'Presente')
+	#(14, u'Pret\xe9rito perfecto')
+	#(15, u'Pret\xe9rito imperfecto')
+	#(16, u'Pret\xe9rito pluscuamperfecto')
+	#(17, u'Pret\xe9rito imperfecto II')
+	#(18, u'Pret\xe9rito pluscuamperfecto II')
+	#(19, 'Futuro imperfecto')
+	#(20, 'Futuro perfecto')
 
+	PRESENTE = 3
+	PRETERITO_PERFECTO = 4
+	POST_PRETERITO = 5
+	PLUSCUAMPERFECTO = 6
+	PRETERITO = 7
+	FUTURO = 9
+	PRESENTE_SUBJUNTIVO = 13
+	
 	CSV_SEPARATOR = ','
 	TEXT_DELIMITER = '"'
 	WORD_SPLIT_REGEX = ur'[ \t-\.,:;!\?\(\)"\'“”]'
@@ -292,27 +320,29 @@ class Wordanalyzer:
 	
 	@staticmethod
 	def get_conjugation_es(verb, tense):
+		urlencoded = urllib2.quote(verb.encode('iso-8859-1'))
 		verb = verb.encode('utf-8')
-		url = u'http://dix.osola.com/v.php?search=' + urllib2.quote(verb)
+		url = u'http://dix.osola.com/v.php?search=' + urlencoded.encode('utf-8')
 		
-		content = Wordanalyzer.get_content_from_url(url, 'latin-1')
+		content = Wordanalyzer.get_content_from_url(url, 'iso-8859-1')
 		if content != None:
 			p = pq(url=None, opener=lambda url: content)
 			
 			table_headers = p('td.contentheadcenter')
-			conjugation_table = p(table_headers[tense]).parent().parent()
-			conjugation_cells = conjugation_table.find('td:last-child')
+			if len(table_headers) > tense:
+				conjugation_table = p(table_headers[tense]).parent().parent()
+				conjugation_cells = conjugation_table.find('td:last-child')
 			
-			conjugations = None
+				conjugations = []
 			
-			for cell in conjugation_cells:
-				if conjugations == None: # skip first line
-					conjugations = []
-				else:
+				for cell in conjugation_cells:
 					conjugations.append(p(cell).text())
-			#end for
+				#end for
 			
-			return conjugations
+				return conjugations
+			else:
+				print(u'Cannot find conjugations for verb "' + unicode(verb, 'utf-8') + u'"')
+			#end if
 		#end if
 		
 		return None
@@ -381,10 +411,31 @@ class Wordanalyzer:
 			if len(row) < 2:
 				print('Skip incomplete row')
 			else:
-				p = Processable(lambda word: Wordanalyzer.get_translation_es(row[0]), row[0], row)
+				p = Processable(lambda word: Wordanalyzer.get_translation_es(word), row[0], row)
 				p.start()
 				
 				thread_pool.add(p)
+			#end if
+		#end for
+		
+		thread_pool.finish()
+	#end def
+	
+	def print_conjugation_table(self, tenses):
+		thread_pool = ThreadPool(self.__print_conjugation_table)
+		rows = Wordanalyzer.READER.parse(self.src)
+
+		self.print_csv_row([u'[Infinitive]', u'[Tense]', u'[yo]', u'[tú]', u'[el/ella/usted]', u'[nosotros, -as]', u'[vosotros, -as]', u'[ellos/ellas/ustedes]']) # print header
+		for row in rows:
+			if len(row) < 1:
+				print('Skip incomplete row')
+			else:
+				for tense in tenses:
+					p = Processable(lambda word: Wordanalyzer.get_conjugation_es(word, tense), row[0], row)
+					p.start()
+				
+					thread_pool.add(p)
+				#end for
 			#end if
 		#end for
 		
@@ -412,6 +463,14 @@ class Wordanalyzer:
 
 		self.print_csv_row(row)
 	#end def
+	
+	def __print_conjugation_table(self, result, row):
+		if result != None:
+			row.extend(result)
+		#end if
+		
+		self.print_csv_row(row)
+	#end def
 #end class
 
 def main(argv):
@@ -420,12 +479,13 @@ def main(argv):
 		print('wordanalyzer [option] [inputfile] [outputfile]')
 		print('\t--wordlist\tprints list of words contained in [file]')
 		print('\t--check-csv\tprints enhanced version of cvs file [file]')
+		print('\t--conjugate-verbs\tprints table with conjugated verbs from cvs file [file]')
 		
 		#word = u'el/la líder'
 		#print(word)
 		#print(Wordanalyzer.get_translation_es_2(word))
 		
-		print(Wordanalyzer.get_conjugation_es('comprender', Wordanalyzer.PRESENT_TENSE))
+		#print(Wordanalyzer.get_conjugation_es('comprender', Wordanalyzer.PRESENTE))
 		
 		exit(1)
 	#end if
@@ -441,6 +501,8 @@ def main(argv):
 			analyzer.print_word_list()
 		elif mode == '--check-csv':
 			analyzer.print_enhanced_table()
+		elif mode == '--conjugate-verbs':
+			analyzer.print_conjugation_table([Wordanalyzer.PRESENTE_SUBJUNTIVO])
 		else:
 			print('Invalid mode!')
 			exit(1)
@@ -453,6 +515,8 @@ def main(argv):
 				analyzer.print_word_list()
 			elif mode == '--check-csv':
 				analyzer.print_enhanced_table()
+			elif mode == '--conjugate-verbs':
+				analyzer.print_conjugation_table([Wordanalyzer.PRESENTE_SUBJUNTIVO])
 			else:
 				print('Invalid mode!')
 				exit(1)
