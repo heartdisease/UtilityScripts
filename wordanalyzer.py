@@ -9,6 +9,8 @@ import urllib
 import urllib2
 import codecs
 
+import wordlist
+
 class CsvReader:
 	# @param separator character that separates columns
 	# @param delimiter for text (e.g. " or ')
@@ -136,6 +138,7 @@ class Wordanalyzer:
 	CSV_SEPARATOR = ','
 	TEXT_DELIMITER = '"'
 	WORD_SPLIT_REGEX = ur'[ \t-\.,:;!\?\(\)"\'“”]'
+	WORD_PATTERN = re.compile(r'(?:(el/la|el|la) )?(\w[\w ]+)(?:, -(\w+))?')
 	EXCLUDED_WORDS = set([
 		'qué', 'cuál', 'quién', 'dónde', 'adonde', 'cómo', 'que', 'como',
 		'mio', 'tuyo', 'suyo', 'nuestro', 'nuestros', 'nuestra', 'nuestras', 'mis', 'tus', 'sus',
@@ -154,6 +157,37 @@ class Wordanalyzer:
 		'Content-type' : 'application/x-www-form-urlencoded; charset=utf-8'
 	}
 	
+	# Strips all extras like annotations, articles etc.
+	@staticmethod
+	def normalize_word(word):
+		components = Wordanalyzer.WORD_PATTERN.findall(re.sub(r' ?\[[\w\.]*\]', '', word), re.UNICODE)
+		return components[0][1] if len(components) > 0 else word
+	#end def
+	
+	# Converts a vocabulary list-style string into a list of separate words.
+	#
+	# Example: 'el/la jugador, -a' turns into ['el jugador', 'la jugadora']
+	@staticmethod
+	def resolve_word_list(string):
+		words = []
+		word_groups = Wordanalyzer.WORD_PATTERN.findall(re.sub(r' ?\[[\w\.]*\]', '', string), re.UNICODE)
+		
+		for group in word_groups:
+			words.append(group[1])
+			
+			if len(group[2]) > 0: # generate female version if available
+				if group[1][-1] == 'o': # last letter is vowel 'o'
+					words.append(group[1][:-len(group[2])] + group[2])
+				else:
+					words.append(group[1][:-len(group[2]) + 1] + group[2])
+				#end if
+			#end if
+		#end for
+		
+		return set(words)
+	#end def
+	
+	# Returns content of a given URL as a text object
 	@staticmethod
 	def get_content_from_url(url, encoding = 'utf-8', headers = STD_HEADERS):
 		response = urllib2.urlopen(urllib2.Request(url, headers=headers))
@@ -165,13 +199,6 @@ class Wordanalyzer:
 		#end try
 		
 		return None
-	#end def
-	
-	@staticmethod
-	def normalize_word(word):
-		word = word.replace('el/la', 'el').replace('o, -a', 'o')
-		slash_index = word.find('/') # in case of 'el/la' pair, remove '/la' to avoid problems with search engine
-		return word.encode('utf-8') if slash_index == -1 else word[slash_index + 1:].encode('utf-8')
 	#end def
 	
 	##
@@ -442,6 +469,27 @@ class Wordanalyzer:
 		thread_pool.finish()
 	#end def
 	
+	def print_word_array(self):
+		rows = Wordanalyzer.READER.parse(self.src)
+
+		self.out.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION = [\n') # print header
+		first_row = True
+		for row in rows:
+			for word in Wordanalyzer.resolve_word_list(row[0]):
+				if first_row:
+					self.out.write('\t  u\'')
+					first_row = False
+				else:
+					self.out.write('\t, u\'')
+				#end if
+				
+				self.out.write(word)
+				self.out.write('\'\n')
+			#end for
+		#end for
+		self.out.write(']\n')
+	#end def
+	
 	def __print_word_row(self, result, row):
 		row.append(u'unknown' if result['normalized'] == None else result['normalized'])
 		row.append(u'unknown' if result['translation'] == None else result['translation'])
@@ -480,12 +528,20 @@ def main(argv):
 		print('\t--wordlist\tprints list of words contained in [file]')
 		print('\t--check-csv\tprints enhanced version of cvs file [file]')
 		print('\t--conjugate-verbs\tprints table with conjugated verbs from cvs file [file]')
+		print('\t--word-array\tprints python code with list of words from cvs file [file]')
 		
 		#word = u'el/la líder'
 		#print(word)
 		#print(Wordanalyzer.get_translation_es_2(word))
 		
 		#print(Wordanalyzer.get_conjugation_es('comprender', Wordanalyzer.PRESENTE))
+		
+		for row in Wordanalyzer.READER.parse('csv/new.words.csv'):
+			word = Wordanalyzer.normalize_word(row[0])
+			if word not in wordlist.WORD_COLLECTION:
+				print(word)
+			#end if
+		#end if
 		
 		exit(1)
 	#end if
@@ -503,6 +559,8 @@ def main(argv):
 			analyzer.print_enhanced_table()
 		elif mode == '--conjugate-verbs':
 			analyzer.print_conjugation_table([Wordanalyzer.PRESENTE_SUBJUNTIVO])
+		elif mode == '--word-array':
+			analyzer.print_word_array()		
 		else:
 			print('Invalid mode!')
 			exit(1)
@@ -517,6 +575,8 @@ def main(argv):
 				analyzer.print_enhanced_table()
 			elif mode == '--conjugate-verbs':
 				analyzer.print_conjugation_table([Wordanalyzer.PRESENTE_SUBJUNTIVO])
+			elif mode == '--word-array':
+				analyzer.print_word_array()
 			else:
 				print('Invalid mode!')
 				exit(1)
