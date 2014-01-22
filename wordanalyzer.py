@@ -128,11 +128,11 @@ class Wordanalyzer:
 	#(20, 'Futuro perfecto')
 
 	PRESENTE = 3
-	PRETERITO_PERFECTO = 4
-	POST_PRETERITO = 5
-	PLUSCUAMPERFECTO = 6
-	PRETERITO = 7
-	FUTURO = 9
+	PRETERITO_IMPERFECTO = 5
+	PRETERITO_PLUSCUAMPERFECTO = 6
+	PRETERITO_INDEFINIDO = 7
+	FUTURO_IMPERFECTO = 9
+	CONDICIONAL_SIMPLE = 11
 	PRESENTE_SUBJUNTIVO = 13
 	
 	CSV_SEPARATOR = ','
@@ -534,14 +534,23 @@ def main(argv):
 		#print(word)
 		#print(Wordanalyzer.get_translation_es_2(word))
 		
-		#print(Wordanalyzer.get_conjugation_es('comprender', Wordanalyzer.PRESENTE))
+		#PRESENTE = 3
+		#PRETERITO_IMPERFECTO = 5
+		#PRETERITO_PLUSCUAMPERFECTO = 6
+		#PRETERITO_INDEFINIDO = 7
+		#FUTURO_IMPERFECTO = 9
+		#CONDICIONAL_SIMPLE = 11
+		#PRESENTE_SUBJUNTIVO = 13
 		
-		for row in Wordanalyzer.READER.parse('csv/new.words.csv'):
-			word = Wordanalyzer.normalize_word(row[0])
-			if word not in wordlist.WORD_COLLECTION:
-				print(word)
-			#end if
-		#end if
+		#for entry in Wordanalyzer.get_conjugation_es('comprender', Wordanalyzer.PRESENTE_SUBJUNTIVO):
+			#print(entry)
+		
+		#for row in Wordanalyzer.READER.parse('csv/new.words.csv'):
+		#	word = Wordanalyzer.normalize_word(row[0])
+		#	if word not in wordlist.WORD_COLLECTION:
+		#		print(word)
+		#	#end if
+		##end if
 		
 		exit(1)
 	#end if
@@ -557,8 +566,9 @@ def main(argv):
 			analyzer.print_word_list()
 		elif mode == '--check-csv':
 			analyzer.print_enhanced_table()
-		elif mode == '--conjugate-verbs':
-			analyzer.print_conjugation_table([Wordanalyzer.PRESENTE_SUBJUNTIVO])
+		elif mode.startswith('--conjugate-verbs='):
+			tense = getattr(Wordanalyzer, mode[18:]) # 18 = length of mode string
+			analyzer.print_conjugation_table([tense])
 		elif mode == '--word-array':
 			analyzer.print_word_array()		
 		else:
@@ -573,8 +583,9 @@ def main(argv):
 				analyzer.print_word_list()
 			elif mode == '--check-csv':
 				analyzer.print_enhanced_table()
-			elif mode == '--conjugate-verbs':
-				analyzer.print_conjugation_table([Wordanalyzer.PRESENTE_SUBJUNTIVO])
+			elif mode.startswith('--conjugate-verbs='):
+				tense = getattr(Wordanalyzer, mode[18:]) # 18 = length of mode string
+				analyzer.print_conjugation_table([tense])
 			elif mode == '--word-array':
 				analyzer.print_word_array()
 			else:
