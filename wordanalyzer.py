@@ -194,7 +194,7 @@ class Wordanalyzer:
 		
 		try:
 			return unicode(response.read(), encoding).replace('\n', ' ')
-		except UnicodeDecodeError, e:
+		except TypeError, e:
 			print(str(e))
 		#end try
 		
@@ -210,7 +210,7 @@ class Wordanalyzer:
 	@staticmethod
 	def get_translation_es(word):
 		word = Wordanalyzer.normalize_word(word)
-		url = u'http://www.spanishdict.com/translate/' + urllib.quote(word)
+		url = u'http://www.spanishdict.com/translate/%s' % urllib2.quote(word.encode('utf-8'))
 		normalized  = None
 		translation = None
 		wordtype    = None
@@ -280,10 +280,10 @@ class Wordanalyzer:
 				translation = translation.replace(';', ',').replace(' , ', ', ')
 			#end if
 		else:
-			print(u'Invalid response for "' + unicode(word, 'utf-8') + '".')
+			print(u'Invalid response for "' + word + '".')
 		#end if
 	
-		return { 'normalized' : normalized if normalized != None else unicode(word, 'utf-8'), 'translation' : translation, 'wordtype' : wordtype }
+		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
 	#end def
 	
 	##
@@ -294,13 +294,14 @@ class Wordanalyzer:
 	##
 	@staticmethod
 	def get_translation_es_2(word):
-		word = Wordanalyzer.normalize_word(word)		
-		url = u'http://www.diccionario-ingles.info/index.php?search=' + urllib2.quote(word)
+		word = Wordanalyzer.normalize_word(word)
+		url = u'http://www.diccionario-ingles.info/index.php?search=%s' % urllib2.quote(word.encode('iso-8859-1'))
+		
 		normalized  = None
 		translation = None
 		wordtype    = None
 		
-		content = Wordanalyzer.get_content_from_url(url, 'latin-1')
+		content = Wordanalyzer.get_content_from_url(url, 'iso-8859-1')
 		if content != None:
 			p = pq(url=None, opener=lambda url: content)
 			
@@ -316,6 +317,9 @@ class Wordanalyzer:
 				spanish_row = pq(spanish_rows[i]).text()
 				
 				if normalized == None:
+					#print('word: ', word, ' ', type(word))
+					#print('spanish_row: ', spanish_row, ' ', type(spanish_row))
+					
 					if word in spanish_row:
 						word_info = pq(info_rows[i]).attr('onmouseover')
 						wordtype_match = re.match(r"showinfomenu\([0-9]+,'ES','es_en',this,'\w+','[0-9]+',[0-9]+,'\w+','(\w+)'", word_info)
@@ -339,17 +343,15 @@ class Wordanalyzer:
 				#end if
 			#end for
 		else:
-			print(u'Invalid response for "' + unicode(word, 'utf-8') + '".')
+			print(u'Invalid response for "' + word + '".')
 		#end if
 	
-		return { 'normalized' : normalized, 'translation' : translation, 'wordtype' : wordtype }
+		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
 	#end def
 	
 	@staticmethod
 	def get_conjugation_es(verb, tense):
-		urlencoded = urllib2.quote(verb.encode('iso-8859-1'))
-		verb = verb.encode('utf-8')
-		url = u'http://dix.osola.com/v.php?search=' + urlencoded.encode('utf-8')
+		url = u'http://dix.osola.com/v.php?search=%s' % urllib2.quote(verb.encode('iso-8859-1'))
 		
 		content = Wordanalyzer.get_content_from_url(url, 'iso-8859-1')
 		if content != None:
@@ -359,16 +361,22 @@ class Wordanalyzer:
 			if len(table_headers) > tense:
 				conjugation_table = p(table_headers[tense]).parent().parent()
 				conjugation_cells = conjugation_table.find('td:last-child')
-			
+				
+				tense_name = None
 				conjugations = []
 			
 				for cell in conjugation_cells:
-					conjugations.append(p(cell).text())
+					if tense_name == None:
+						tense_name = p(cell).text()
+					else:
+						conjugations.append(p(cell).text())
+					#end if
 				#end for
-			
+				conjugations.append(tense_name)
+				
 				return conjugations
 			else:
-				print(u'Cannot find conjugations for verb "' + unicode(verb, 'utf-8') + u'"')
+				print(u'Cannot find conjugations for verb "%s".' % verb)
 			#end if
 		#end if
 		
@@ -438,7 +446,7 @@ class Wordanalyzer:
 			if len(row) < 2:
 				print('Skip incomplete row')
 			else:
-				p = Processable(lambda word: Wordanalyzer.get_translation_es(word), row[0], row)
+				p = Processable(lambda word: Wordanalyzer.get_translation_es_2(word), row[0], row)
 				p.start()
 				
 				thread_pool.add(p)
