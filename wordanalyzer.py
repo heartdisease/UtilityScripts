@@ -105,28 +105,6 @@ class ThreadPool:
 #end class
 
 class Wordanalyzer:
-	#(0, 'Formas basicas')
-	#(1, 'Imperativo')
-	#(2, 'negativo')
-	#(3, 'Presente')
-	#(4, u'Pret\xe9rito perfecto')
-	#(5, u'Pret\xe9rito imperfecto')
-	#(6, u'Pret\xe9rito pluscuamperfecto')
-	#(7, u'Pret\xe9rito indefinido')
-	#(8, u'Pret\xe9rito anterior')
-	#(9, 'Futuro imperfecto')
-	#(10, 'Futuro perfecto')
-	#(11, 'Condicional simple')
-	#(12, 'Condicional compuesto')
-	#(13, 'Presente')
-	#(14, u'Pret\xe9rito perfecto')
-	#(15, u'Pret\xe9rito imperfecto')
-	#(16, u'Pret\xe9rito pluscuamperfecto')
-	#(17, u'Pret\xe9rito imperfecto II')
-	#(18, u'Pret\xe9rito pluscuamperfecto II')
-	#(19, 'Futuro imperfecto')
-	#(20, 'Futuro perfecto')
-
 	PRESENTE = 3
 	PRETERITO_IMPERFECTO = 5
 	PRETERITO_PLUSCUAMPERFECTO = 6
@@ -383,9 +361,15 @@ class Wordanalyzer:
 		return None
 	#end def
 	
-	def __init__(self, src, ostream):
-		self.src = src
-		self.out = ostream
+	def __init__(self, src, out = None):
+		self._src = src
+		self._ostream = sys.stdout if out == None else codecs.open(out, 'w', 'utf-8')
+	#end def
+	
+	def close(self):
+		if self._ostream != sys.stdout:
+			self._ostream.close()
+		#end if
 	#end def
 	
 	def print_csv_row(self, cols):
@@ -393,17 +377,17 @@ class Wordanalyzer:
 	
 		for col in cols:
 			if not first_col:
-				self.out.write(Wordanalyzer.CSV_SEPARATOR)
+				self._ostream.write(Wordanalyzer.CSV_SEPARATOR)
 			else:
 				first_col = False
 			#end if
 		
-			self.out.write('"')
-			self.out.write(col)
-			self.out.write('"')
+			self._ostream.write('"')
+			self._ostream.write(col)
+			self._ostream.write('"')
 		#end for
 	
-		self.out.write('\n')
+		self._ostream.write('\n')
 	#end def
 
 	##
@@ -413,7 +397,7 @@ class Wordanalyzer:
 	# @param out output stream
 	##
 	def print_word_list(self):
-		with codecs.open(self.src, 'r', 'utf-8') as f:	
+		with codecs.open(self._src, 'r', 'utf-8') as f:	
 			thread_pool = ThreadPool(self.__print_word_row)
 			text = f.read().replace('\n', ' ').lower() # ignore case and replace newlines with spaces
 			wordset = set(word for word in re.split(Wordanalyzer.WORD_SPLIT_REGEX, text) if len(word) > 2 and re.match(r'[0-9@]+', word) == None)
@@ -439,14 +423,14 @@ class Wordanalyzer:
 	##
 	def print_enhanced_table(self):
 		thread_pool = ThreadPool(self.__print_enhanced_row)
-		rows = Wordanalyzer.READER.parse(self.src)
+		rows = Wordanalyzer.READER.parse(self._src)
 
 		self.print_csv_row(['[Original word]', '[Normalized form]', '[New translation]', '[Translation]', '[Word type]', '[Checked]']) # print header
 		for row in rows:
 			if len(row) < 2:
 				print('Skip incomplete row')
 			else:
-				p = Processable(lambda word: Wordanalyzer.get_translation_es_2(word), row[0], row)
+				p = Processable(lambda word: Wordanalyzer.get_translation_es(word), row[0], row)
 				p.start()
 				
 				thread_pool.add(p)
@@ -458,7 +442,7 @@ class Wordanalyzer:
 	
 	def print_conjugation_table(self, tenses):
 		thread_pool = ThreadPool(self.__print_conjugation_table)
-		rows = Wordanalyzer.READER.parse(self.src)
+		rows = Wordanalyzer.READER.parse(self._src)
 
 		self.print_csv_row([u'[Infinitive]', u'[Tense]', u'[yo]', u'[tú]', u'[el/ella/usted]', u'[nosotros, -as]', u'[vosotros, -as]', u'[ellos/ellas/ustedes]']) # print header
 		for row in rows:
@@ -478,24 +462,48 @@ class Wordanalyzer:
 	#end def
 	
 	def print_word_array(self):
-		rows = Wordanalyzer.READER.parse(self.src)
+		rows = Wordanalyzer.READER.parse(self._src)
 
-		self.out.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION = [\n') # print header
+		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION = [\n') # print header
 		first_row = True
 		for row in rows:
 			for word in Wordanalyzer.resolve_word_list(row[0]):
 				if first_row:
-					self.out.write('\t  u\'')
+					self._ostream.write('\t  u\'')
 					first_row = False
 				else:
-					self.out.write('\t, u\'')
+					self._ostream.write('\t, u\'')
 				#end if
 				
-				self.out.write(word)
-				self.out.write('\'\n')
+				self._ostream.write(word)
+				self._ostream.write('\'\n')
 			#end for
 		#end for
-		self.out.write(']\n')
+		self._ostream.write(']\n')
+	#end def
+	
+	def print_new_words(self):
+		for row in Wordanalyzer.READER.parse(self._src):
+			word = Wordanalyzer.normalize_word(row[0])
+			if word not in wordlist.WORD_COLLECTION:
+				self._ostream.write(word)
+				self._ostream.write('\n')
+			#end if
+		#end if
+	#end def
+	
+	def print_difference(self, newfile):
+		count = 0
+		ignore = [row[0] for row in Wordanalyzer.READER.parse(self._src)]
+		
+		for row in Wordanalyzer.READER.parse(newfile):
+			if row[0] not in ignore:
+				self.print_csv_row(row)
+				count += 1
+			#end if
+		#end
+	
+		print("%d new rows" % count)
 	#end def
 	
 	def __print_word_row(self, result, row):
@@ -530,78 +538,66 @@ class Wordanalyzer:
 #end class
 
 def main(argv):
-	if len(argv) != 4:
-		print('Argument is missing!')
-		print('wordanalyzer [option] [inputfile] [outputfile]')
-		print('\t--wordlist\tprints list of words contained in [file]')
-		print('\t--check-csv\tprints enhanced version of cvs file [file]')
-		print('\t--conjugate-verbs\tprints table with conjugated verbs from cvs file [file]')
-		print('\t--word-array\tprints python code with list of words from cvs file [file]')
+	if not 4 <= len(argv) <= 5:
+		print('Invalid parameter count!')
+		print('wordanalyzer.py [option] [input file] [output file]|[[diff file] [output file]]')
+		print('Options:')
+		print('\t--wordlist                prints list of words contained in [input file]')
+		print('\t--check-csv               prints enhanced version of cvs file [input file]')
+		print('\t--conjugate-verbs=[TENSE] prints table with conjugated verbs from cvs file [input file]')
+		print('\t--word-array              prints python code with list of words from cvs file [input file]')
+		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist.py)')
+		print('\t--diff-csv                prints words from cvs file [diff file] that are not part of csv file [input file]')
+		print
+		print('Conjugation modes:')
+		print('\tPRESENTE')
+		print('\tPRETERITO_IMPERFECTO')
+		print('\tPRETERITO_PLUSCUAMPERFECTO')
+		print('\tPRETERITO_INDEFINIDO')
+		print('\tFUTURO_IMPERFECTO')
+		print('\tCONDICIONAL_SIMPLE')
+		print('\tPRESENTE_SUBJUNTIVO')
 		
 		#word = u'el/la líder'
 		#print(word)
 		#print(Wordanalyzer.get_translation_es_2(word))
 		
-		#PRESENTE = 3
-		#PRETERITO_IMPERFECTO = 5
-		#PRETERITO_PLUSCUAMPERFECTO = 6
-		#PRETERITO_INDEFINIDO = 7
-		#FUTURO_IMPERFECTO = 9
-		#CONDICIONAL_SIMPLE = 11
-		#PRESENTE_SUBJUNTIVO = 13
-		
-		#for entry in Wordanalyzer.get_conjugation_es('comprender', Wordanalyzer.PRESENTE_SUBJUNTIVO):
-			#print(entry)
-		
-		#for row in Wordanalyzer.READER.parse('csv/new.words.csv'):
-		#	word = Wordanalyzer.normalize_word(row[0])
-		#	if word not in wordlist.WORD_COLLECTION:
-		#		print(word)
-		#	#end if
-		##end if
-		
 		exit(1)
 	#end if
 
 	mode = argv[1]
-	inputfile = argv[2]
-	outputfile = argv[3]
-	
-	if outputfile == '-':
-		analyzer = Wordanalyzer(inputfile, sys.stdout)
-	
-		if mode == '--wordlist':
-			analyzer.print_word_list()
-		elif mode == '--check-csv':
-			analyzer.print_enhanced_table()
-		elif mode.startswith('--conjugate-verbs='):
-			tense = getattr(Wordanalyzer, mode[18:]) # 18 = length of mode string
-			analyzer.print_conjugation_table([tense])
-		elif mode == '--word-array':
-			analyzer.print_word_array()		
-		else:
-			print('Invalid mode!')
-			exit(1)
-		#end if
+	input_file  = argv[2]
+	output_file = None
+	diff_file   = None
+	if len(argv) == 5:
+		diff_file   = argv[3]
+		output_file = argv[4]
 	else:
-		with codecs.open(outputfile, 'w', 'utf-8') as ostream:
-			analyzer = Wordanalyzer(inputfile, ostream)
-			
-			if mode == '--wordlist':
-				analyzer.print_word_list()
-			elif mode == '--check-csv':
-				analyzer.print_enhanced_table()
-			elif mode.startswith('--conjugate-verbs='):
-				tense = getattr(Wordanalyzer, mode[18:]) # 18 = length of mode string
-				analyzer.print_conjugation_table([tense])
-			elif mode == '--word-array':
-				analyzer.print_word_array()
-			else:
-				print('Invalid mode!')
-				exit(1)
-			#end if
-		#end with
+		output_file = argv[3]
+	#end if	
+	
+	analyzer = Wordanalyzer(input_file) if output_file == '-' else Wordanalyzer(input_file, output_file)
+	
+	if mode == '--wordlist':
+		analyzer.print_word_list()
+	elif mode == '--check-csv':
+		analyzer.print_enhanced_table()
+	elif mode.startswith('--conjugate-verbs='):
+		identifier = mode[18:] # 18 = length of mode string
+		tense = getattr(Wordanalyzer, identifier) # retrieve constant with reflection
+		analyzer.print_conjugation_table([tense])
+	elif mode == '--word-array':
+		analyzer.print_word_array()
+	elif mode == '--check-new':
+		analyzer.print_new_words()
+	elif mode == '--diff-csv':
+		analyzer.print_difference(diff_file)
+	else:
+		print('Invalid mode!')
+		exit(1)
 	#end if
+	
+	analyzer.close()
 #end def
 
 main(sys.argv)
