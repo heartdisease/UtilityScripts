@@ -104,27 +104,7 @@ class ThreadPool:
 	#end def
 #end class
 
-class Wordanalyzer:
-	PRESENTE = 3
-	PRETERITO_IMPERFECTO = 5
-	PRETERITO_PLUSCUAMPERFECTO = 6
-	PRETERITO_INDEFINIDO = 7
-	FUTURO_IMPERFECTO = 9
-	CONDICIONAL_SIMPLE = 11
-	PRESENTE_SUBJUNTIVO = 13
-	
-	CSV_SEPARATOR = ','
-	TEXT_DELIMITER = '"'
-	WORD_SPLIT_REGEX = ur'[ \t-\.,:;!\?\(\)"\'“”]'
-	WORD_PATTERN = re.compile(r'(?:(el/la|el|la) )?(\w[\w ]+)(?:, -(\w+))?')
-	EXCLUDED_WORDS = set([
-		'qué', 'cuál', 'quién', 'dónde', 'adonde', 'cómo', 'que', 'como',
-		'mio', 'tuyo', 'suyo', 'nuestro', 'nuestros', 'nuestra', 'nuestras', 'mis', 'tus', 'sus',
-		'los', 'las', 'les', 'ella', 'ellos' 'con', 'sin', 'desde', 'nosotros', 'vosotros', 'ellos', 'ellas',
-		'este', 'esta', 'está', 'una', 'uno', 'son',	'por', 'para', 'porque', 'cómo', 'soy', 'estoy',
-		'nos', 'vos', 'hay', 'del', 'esto', 'han','hemos', 'más', 'pero', 'ser', 'estar'
-	])
-	READER = CsvReader(CSV_SEPARATOR, TEXT_DELIMITER)
+class Translator:
 	STD_HEADERS = {
 		'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36',
 		'Accept-Language' : 'es-419,es'
@@ -134,11 +114,12 @@ class Wordanalyzer:
 		'Accept-Language' : 'es-419,es',
 		'Content-type' : 'application/x-www-form-urlencoded; charset=utf-8'
 	}
+	WORD_PATTERN = re.compile(r'(?:(el/la|el|la) )?(\w[\w ]+)(?:, -(\w+))?')
 	
 	# Strips all extras like annotations, articles etc.
 	@staticmethod
 	def normalize_word(word):
-		components = Wordanalyzer.WORD_PATTERN.findall(re.sub(r' ?\[[\w\.]*\]', '', word), re.UNICODE)
+		components = Translator.WORD_PATTERN.findall(re.sub(r' ?\[[\w\.]*\]', '', word), re.UNICODE)
 		return components[0][1] if len(components) > 0 else word
 	#end def
 	
@@ -148,7 +129,7 @@ class Wordanalyzer:
 	@staticmethod
 	def resolve_word_list(string):
 		words = []
-		word_groups = Wordanalyzer.WORD_PATTERN.findall(re.sub(r' ?\[[\w\.]*\]', '', string), re.UNICODE)
+		word_groups = Translator.WORD_PATTERN.findall(re.sub(r' ?\[[\w\.]*\]', '', string), re.UNICODE)
 		
 		for group in word_groups:
 			words.append(group[1])
@@ -165,18 +146,37 @@ class Wordanalyzer:
 		return set(words)
 	#end def
 	
-	# Returns content of a given URL as a text object
-	@staticmethod
-	def get_content_from_url(url, encoding = 'utf-8', headers = STD_HEADERS):
-		response = urllib2.urlopen(urllib2.Request(url, headers=headers))
-		
+	def __init__(self, url_template, encoding = 'utf-8', headers = STD_HEADERS):
+		self._url_template = url_template
+		self._encoding     = encoding
+		self._headers      = headers
+	#end def
+	
+	def _pquery(self, word):
+		content = self.__get_content_from_url(Translator.normalize_word(word))
+		return pq(url=None, opener=lambda url: content) if content != None else None
+	#end def
+	
+	def __get_content_from_url(self, get_data):
 		try:
-			return unicode(response.read(), encoding).replace('\n', ' ')
+			url = self._url_template % urllib2.quote(get_data.encode(self._encoding))
+			response = urllib2.urlopen(urllib2.Request(url, headers=self._headers))
+			return unicode(response.read(), self._encoding).replace('\n', ' ')
 		except TypeError, e:
+			print('Failed to encode page for word "%s".' % get_data)
+			print(str(e))
+		except urllib2.HTTPError, e:
+			print('Failed to retrieve page for word "%s".' % get_data)
 			print(str(e))
 		#end try
 		
 		return None
+	#end def
+#end
+
+class SpanishdictCom(Translator):
+	def __init__(self):
+		Translator.__init__(self, u'http://www.spanishdict.com/translate/%s')
 	#end def
 	
 	##
@@ -185,18 +185,13 @@ class Wordanalyzer:
 	# @param word to be looked up on SpanishDict.com
 	# @return dictionary with information about the word
 	##
-	@staticmethod
-	def get_translation_es(word):
-		word = Wordanalyzer.normalize_word(word)
-		url = u'http://www.spanishdict.com/translate/%s' % urllib2.quote(word.encode('utf-8'))
+	def get_translation(self, word):
 		normalized  = None
 		translation = None
 		wordtype    = None
 		
-		content = Wordanalyzer.get_content_from_url(url)
-		if content != None:
-			p = pq(url=None, opener=lambda url: content)
-	
+		p = self._pquery(word)
+		if p != None:
 			result_block = p('div.results-block')
 			normalized   = result_block.find('h1.word').text()
 			translation  = result_block.find('h2.quick_def').text()
@@ -263,6 +258,12 @@ class Wordanalyzer:
 	
 		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
 	#end def
+#end class
+
+class DixOsolaCom(Translator):
+	def __init__(self):
+		Translator.__init__(self, u'http://www.diccionario-ingles.info/index.php?search=%s', 'iso-8859-1')
+	#end def
 	
 	##
 	# Returns a dictionary that contains the normalized version of the word, the translation and the word type (e.g. noun).
@@ -270,19 +271,13 @@ class Wordanalyzer:
 	# @param word to be looked up on diccionario-ingles.info
 	# @return dictionary with information about the word
 	##
-	@staticmethod
-	def get_translation_es_2(word):
-		word = Wordanalyzer.normalize_word(word)
-		url = u'http://www.diccionario-ingles.info/index.php?search=%s' % urllib2.quote(word.encode('iso-8859-1'))
-		
+	def get_translation(self, word):
 		normalized  = None
 		translation = None
 		wordtype    = None
 		
-		content = Wordanalyzer.get_content_from_url(url, 'iso-8859-1')
-		if content != None:
-			p = pq(url=None, opener=lambda url: content)
-			
+		p = self._pquery(word)
+		if p != None:
 			normalized  = None
 			translation = None
 			wordtype    = None
@@ -326,15 +321,16 @@ class Wordanalyzer:
 	
 		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
 	#end def
+#end class
+
+class DixOsolaComConjugator(Translator):
+	def __init__(self):
+		Translator.__init__(self, u'http://dix.osola.com/v.php?search=%s', 'iso-8859-1')
+	#end def
 	
-	@staticmethod
-	def get_conjugation_es(verb, tense):
-		url = u'http://dix.osola.com/v.php?search=%s' % urllib2.quote(verb.encode('iso-8859-1'))
-		
-		content = Wordanalyzer.get_content_from_url(url, 'iso-8859-1')
-		if content != None:
-			p = pq(url=None, opener=lambda url: content)
-			
+	def get_conjugation(self, verb, tense):
+		p = self._pquery(word)
+		if p != None:
 			table_headers = p('td.contentheadcenter')
 			if len(table_headers) > tense:
 				conjugation_table = p(table_headers[tense]).parent().parent()
@@ -359,6 +355,133 @@ class Wordanalyzer:
 		#end if
 		
 		return None
+	#end def
+#end class
+
+class DeWiktionaryOrg(Translator):
+	def __init__(self):
+		Translator.__init__(self, u'http://de.wiktionary.org/wiki/%s')
+	#end def
+
+	def get_translation(self, word):
+		ipa  = None
+		wordtype = None
+		
+		p = self._pquery(word)
+		if p != None:
+			result_block = p('#mw-content-text')
+			ipa      = result_block.find('span.ipa')
+			wordtype = result_block.find('a[title="Hilfe:Wortart"]')
+			
+			ipa = p(ipa[0]).text() if len(ipa) > 0 else ipa.text()
+			wordtype = p(wordtype[0]).text() if len(wordtype) > 0 else wordtype.text()
+		#end if
+	
+		return { 'normalized' : word, 'ipa' : ipa, 'wordtype' : wordtype }
+	#end def
+#end class
+
+class DictCc(Translator):
+	MAX_TRANSLATIONS = 5
+	
+	def __init__(self):
+		Translator.__init__(self, u'http://www.dict.cc/?s=%s')
+	#end def
+	
+	def get_translation(self, word):
+		translation = None
+		wordtype    = None
+		p = self._pquery(word)
+		
+		if p != None:
+			brackets_regex = re.compile(r'\[.*\]')
+			translation_rows = p('tr[id^=tr] td.td7nl')
+			translation_counter = 0
+			
+			for i in range(0, len(translation_rows), 2):
+				pq_english_col = pq(translation_rows[i])
+				english_col = brackets_regex.sub('', pq_english_col.find('a').text()).strip()
+				if pq_english_col.text().startswith('to ') and not english_col.startswith('to '):
+					english_col = 'to ' + english_col
+				#end if
+				
+				#print(english_col)
+				if english_col == word:
+					translation_col = pq(translation_rows[i+1]).find('a').text().strip()
+					
+					if translation == None:
+						translation = translation_col
+					else:
+						translation += ', ' + translation_col
+					#if
+					
+					translation_counter += 1
+					if translation_counter == DictCc.MAX_TRANSLATIONS:
+						break
+					#end if
+				#end if
+			#end for
+			
+			wordtype = '' # TODO detect wordtype
+		#end if
+		
+		return { 'normalized' : word, 'translation' : translation, 'wordtype' : wordtype }
+	#end def
+#end class
+
+class Wordanalyzer:
+	PRESENTE = 3
+	PRETERITO_IMPERFECTO = 5
+	PRETERITO_PLUSCUAMPERFECTO = 6
+	PRETERITO_INDEFINIDO = 7
+	FUTURO_IMPERFECTO = 9
+	CONDICIONAL_SIMPLE = 11
+	PRESENTE_SUBJUNTIVO = 13
+	
+	CSV_SEPARATOR = ','
+	TEXT_DELIMITER = '"'
+	WORD_SPLIT_REGEX = ur'[ \t-\.,:;!\?\(\)"\'“”]'
+	EXCLUDED_WORDS = set([
+		'qué', 'cuál', 'quién', 'dónde', 'adonde', 'cómo', 'que', 'como',
+		'mio', 'tuyo', 'suyo', 'nuestro', 'nuestros', 'nuestra', 'nuestras', 'mis', 'tus', 'sus',
+		'los', 'las', 'les', 'ella', 'ellos' 'con', 'sin', 'desde', 'nosotros', 'vosotros', 'ellos', 'ellas',
+		'este', 'esta', 'está', 'una', 'uno', 'son',	'por', 'para', 'porque', 'cómo', 'soy', 'estoy',
+		'nos', 'vos', 'hay', 'del', 'esto', 'han','hemos', 'más', 'pero', 'ser', 'estar'
+	])
+	READER = CsvReader(CSV_SEPARATOR, TEXT_DELIMITER)
+	DICT_CC_MODULE = None
+	
+	@staticmethod
+	def get_translation_es(word):
+		module = SpanishdictCom()
+		return module.get_translation(word)
+	#end def
+	
+	@staticmethod
+	def get_translation_es_2(word):
+		module = DixOsolaCom()
+		return module.get_translation(word)
+	#end def
+	
+	@staticmethod
+	def get_translation_en(word):
+		if Wordanalyzer.DICT_CC_MODULE == None:
+			Wordanalyzer.DICT_CC_MODULE = DictCc()
+		#end if
+		
+		return Wordanalyzer.DICT_CC_MODULE.get_translation(word)
+	#end def
+	
+	@staticmethod
+	def get_translation_de(word):
+		module = DeWiktionaryOrg()
+		return module.get_translation(word)
+	#end def
+	
+	@staticmethod
+	def get_conjugation_es(verb, tense):
+		module = DixOsolaComConjugator()
+		return module.get_conjugation(verb, tense)
 	#end def
 	
 	def __init__(self, src, out = None):
@@ -431,6 +554,44 @@ class Wordanalyzer:
 				print('Skip incomplete row')
 			else:
 				p = Processable(lambda word: Wordanalyzer.get_translation_es(word), row[0], row)
+				p.start()
+				
+				thread_pool.add(p)
+			#end if
+		#end for
+		
+		thread_pool.finish()
+	#end def
+	
+	def print_enhanced_table_en(self):
+		thread_pool = ThreadPool(self.__print_enhanced_row)
+		rows = Wordanalyzer.READER.parse(self._src)
+
+		self.print_csv_row(['[Original word]', '[Normalized form]', '[New translation]', '[Translation]', '[Word type]', '[Checked]']) # print header
+		for row in rows:
+			if len(row) < 2:
+				print('Skip incomplete row')
+			else:
+				p = Processable(lambda word: Wordanalyzer.get_translation_en(word), row[0], row)
+				p.start()
+				
+				thread_pool.add(p)
+			#end if
+		#end for
+		
+		thread_pool.finish()
+	#end def
+	
+	def print_enhanced_table_de(self):
+		thread_pool = ThreadPool(self.__print_enhanced_row_de)
+		rows = Wordanalyzer.READER.parse(self._src)
+
+		self.print_csv_row(['[Original word]', '[IPA]', '[Word type]']) # print header
+		for row in rows:
+			if len(row) < 2:
+				print('Skip incomplete row')
+			else:
+				p = Processable(lambda word: Wordanalyzer.get_translation_de(word), row[0], row)
 				p.start()
 				
 				thread_pool.add(p)
@@ -528,6 +689,18 @@ class Wordanalyzer:
 		self.print_csv_row(row)
 	#end def
 	
+	def __print_enhanced_row_de(self, result, row):
+		normalized  = u'unknown' if result['normalized'] == None else result['normalized']
+		ipa         = u'unknown' if result['ipa'] == None else result['ipa']
+		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
+
+		row.insert(1, normalized)
+		row.insert(2, ipa)
+		row.insert(4, wordtype)
+
+		self.print_csv_row(row)
+	#end def
+	
 	def __print_conjugation_table(self, result, row):
 		if result != None:
 			row.extend(result)
@@ -543,10 +716,12 @@ def main(argv):
 		print('wordanalyzer.py [option] [input file] [output file]|[[diff file] [output file]]')
 		print('Options:')
 		print('\t--wordlist                prints list of words contained in [input file]')
-		print('\t--check-csv               prints enhanced version of cvs file [input file]')
-		print('\t--conjugate-verbs=[TENSE] prints table with conjugated verbs from cvs file [input file]')
+		print('\t--check-csv-es            prints enhanced version of cvs file [input file] (Spanish)')
+		print('\t--check-csv-en            prints enhanced version of cvs file [input file] (English)')
+		print('\t--check-csv-de            prints enhanced version of cvs file [input file] (German)')
+		print('\t--conjugate-verbs=[TENSE] prints table with conjugated verbs from cvs file [input file] (Spanish)')
 		print('\t--word-array              prints python code with list of words from cvs file [input file]')
-		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist.py)')
+		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist.py) (Spanish)')
 		print('\t--diff-csv                prints words from cvs file [diff file] that are not part of csv file [input file]')
 		print
 		print('Conjugation modes:')
@@ -558,9 +733,8 @@ def main(argv):
 		print('\tCONDICIONAL_SIMPLE')
 		print('\tPRESENTE_SUBJUNTIVO')
 		
-		#word = u'el/la líder'
-		#print(word)
-		#print(Wordanalyzer.get_translation_es_2(word))
+		#trans = Wordanalyzer.get_translation_en('ludicrous')
+		#print(trans['normalized'], trans['translation'], trans['wordtype'])
 		
 		exit(1)
 	#end if
@@ -580,8 +754,12 @@ def main(argv):
 	
 	if mode == '--wordlist':
 		analyzer.print_word_list()
-	elif mode == '--check-csv':
+	elif mode == '--check-csv-es':
 		analyzer.print_enhanced_table()
+	elif mode == '--check-csv-en':
+		analyzer.print_enhanced_table_en()
+	elif mode == '--check-csv-de':
+		analyzer.print_enhanced_table_de()
 	elif mode.startswith('--conjugate-verbs='):
 		identifier = mode[18:] # 18 = length of mode string
 		tense = getattr(Wordanalyzer, identifier) # retrieve constant with reflection
