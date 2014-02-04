@@ -158,14 +158,19 @@ class Translator:
 	#end def
 	
 	def __get_content_from_url(self, get_data):
+		url = self._url_template % urllib2.quote(get_data.encode(self._encoding))
+		content = None
+		
 		try:
-			url = self._url_template % urllib2.quote(get_data.encode(self._encoding))
 			response = urllib2.urlopen(urllib2.Request(url, headers=self._headers))
-			return unicode(response.read(), self._encoding).replace('\n', ' ')
-		except TypeError, e:
-			print('Failed to encode page for word "%s".' % get_data)
-			print(str(e))
-		except urllib2.HTTPError, e:
+			content  = response.read()
+			return unicode(content, self._encoding).replace('\n', ' ')
+		except UnicodeDecodeError as e:
+			if content == None:
+				raise
+			#end if
+			return content.decode(self._encoding, 'ignore').encode(self._encoding).replace('\n', ' ')
+		except Exception as e:
 			print('Failed to retrieve page for word "%s".' % get_data)
 			print(str(e))
 		#end try
@@ -645,7 +650,7 @@ class Wordanalyzer:
 	
 	def print_new_words(self):
 		for row in Wordanalyzer.READER.parse(self._src):
-			word = Wordanalyzer.normalize_word(row[0])
+			word = Translator.normalize_word(row[0])
 			if word not in wordlist.WORD_COLLECTION:
 				self._ostream.write(word)
 				self._ostream.write('\n')
