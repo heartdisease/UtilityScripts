@@ -402,6 +402,7 @@ class DictCc(Translator):
 			brackets_regex = re.compile(r'\[.*\]')
 			translation_rows = p('tr[id^=tr] td.td7nl')
 			translation_counter = 0
+			tmp_word = word
 			
 			for i in range(0, len(translation_rows), 2):
 				pq_english_col = pq(translation_rows[i])
@@ -409,8 +410,12 @@ class DictCc(Translator):
 				if pq_english_col.text().startswith('to ') and not english_col.startswith('to '):
 					english_col = 'to ' + english_col
 				#end if
+				if english_col.startswith('to ') and not word.startswith('to ') and english_col[3:] == word:
+					tmp_word = 'to ' + word
+				else:
+					tmp_word = word
+				#end if
 				
-				#print(english_col)
 				if english_col == word:
 					translation_col = pq(translation_rows[i+1]).find('a').text().strip()
 					
@@ -430,7 +435,7 @@ class DictCc(Translator):
 			wordtype = '' # TODO detect wordtype
 		#end if
 		
-		return { 'normalized' : word, 'translation' : translation, 'wordtype' : wordtype }
+		return { 'normalized' : tmp_word, 'translation' : translation, 'wordtype' : wordtype }
 	#end def
 #end class
 
@@ -446,13 +451,6 @@ class Wordanalyzer:
 	CSV_SEPARATOR = ','
 	TEXT_DELIMITER = '"'
 	WORD_SPLIT_REGEX = ur'[ \t-\.,:;!\?\(\)"\'“”]'
-	EXCLUDED_WORDS = set([
-		'qué', 'cuál', 'quién', 'dónde', 'adonde', 'cómo', 'que', 'como',
-		'mio', 'tuyo', 'suyo', 'nuestro', 'nuestros', 'nuestra', 'nuestras', 'mis', 'tus', 'sus',
-		'los', 'las', 'les', 'ella', 'ellos' 'con', 'sin', 'desde', 'nosotros', 'vosotros', 'ellos', 'ellas',
-		'este', 'esta', 'está', 'una', 'uno', 'son',	'por', 'para', 'porque', 'cómo', 'soy', 'estoy',
-		'nos', 'vos', 'hay', 'del', 'esto', 'han','hemos', 'más', 'pero', 'ser', 'estar'
-	])
 	READER = CsvReader(CSV_SEPARATOR, TEXT_DELIMITER)
 	DICT_CC_MODULE = None
 	
@@ -519,24 +517,42 @@ class Wordanalyzer:
 	#end def
 
 	##
-	# Parses text file containing standard text and generates vocabulary list from it.
+	# Parses text file containing standard text and generates vocabulary list without translations from it.
 	#
 	# @param src path to input file
 	# @param out output stream
 	##
-	def print_word_list(self):
+	def print_word_list(self, lang = None):
 		with codecs.open(self._src, 'r', 'utf-8') as f:	
-			thread_pool = ThreadPool(self.__print_word_row)
-			text = f.read().replace('\n', ' ').lower() # ignore case and replace newlines with spaces
-			wordset = set(word for word in re.split(Wordanalyzer.WORD_SPLIT_REGEX, text) if len(word) > 2 and re.match(r'[0-9@]+', word) == None)
-			words = sorted(wordset - Wordanalyzer.EXCLUDED_WORDS)
-		
-			self.print_csv_row(['[Original word]', '[Normalized form]', '[Translation]', '[Word type]']) # print header
+			text = f.read().replace('\n', ' ') # replace newlines with spaces to avoid cut-off words
+			wordset = set(word for word in re.findall(r"(?u)[\w'-]{3,}", text) if re.match(r'(?u)^[^0-9]+$', word))
+			words = None
+			translation_lambda = None
+			
+			if lang == 'es':
+				words = sorted(wordset - wordlist.WORD_COLLECTION)
+			elif lang == 'de':
+				words = sorted(wordset)
+			elif lang == 'en':
+				words = sorted(wordset)
+			else:
+				words = sorted(wordset)
+			#end if
+			
+			self.print_csv_row(['[Original word]', '[Translation]']) # print header
 			for word in words:
-				p = Processable(lambda word: Wordanalyzer.get_translation_es(word), word, [word])
-				p.start()
+				if lang == 'en':
+					# skip words that accidentially have two hyphens at the end
+					# skip plurals and 3rd-person-s verbs if they exist in base form
+					# skip past tense verbs if they exist in base form
+					if word.endswith('--') or \
+						word[-1] == 's' and word[:-1] in words or \
+						word[-2:] == 'ed' and word[:-2] in words or word[:-1] in words:
+						continue
+					#end if
+				#end if
 				
-				thread_pool.add(p)
+				self.print_csv_row([word, ''])
 			#end for
 		#end with
 	#end def
@@ -658,18 +674,52 @@ class Wordanalyzer:
 		#end if
 	#end def
 	
+	# prints rows from [newfile] that are not part of [self._src]
 	def print_difference(self, newfile):
-		count = 0
-		ignore = [row[0] for row in Wordanalyzer.READER.parse(self._src)]
+		total_count = 0
+		new_count   = 0
+		ignore = [(row[0][3:] if row[0].startswith('to ') else row[0]).strip().lower() for row in Wordanalyzer.READER.parse(self._src)]
 		
 		for row in Wordanalyzer.READER.parse(newfile):
-			if row[0] not in ignore:
+			word = row[0].strip().lower()
+			normalized = word[3:] if word.startswith('to ') else word
+			
+			if normalized not in ignore:
 				self.print_csv_row(row)
-				count += 1
+				new_count += 1
 			#end if
+			total_count += 1
 		#end
 	
-		print("%d new rows" % count)
+		print("%d new rows" % new_count)
+		print("%d rows deleted" % (total_count - new_count))
+	#end def
+	
+	def print_without_duplicates(self):
+		total_count = 0
+		new_count   = 0
+		rows = Wordanalyzer.READER.parse(self._src)
+		checked_words = []
+		
+		for row in rows:
+			word = row[0].strip()
+			normalized = word[3:].lower() if word.startswith('to ') else word.lower()
+			
+			if normalized not in checked_words:
+				checked_words.append(normalized)
+				
+				if word != row[0]: # remove trailing whitespaces
+					row[0] = word
+				#end if
+				self.print_csv_row(row)
+			else:
+				new_count += 1
+			#end if
+			
+			total_count += 1
+		#end for
+		
+		print('Removed %d duplicates from %d lines.' % (new_count, total_count))
 	#end def
 	
 	def __print_word_row(self, result, row):
@@ -720,7 +770,9 @@ def main(argv):
 		print('Invalid parameter count!')
 		print('wordanalyzer.py [option] [input file] [output file]|[[diff file] [output file]]')
 		print('Options:')
-		print('\t--wordlist                prints list of words contained in [input file]')
+		print('\t--wordlist-es             prints list of words contained in [input file] (Spanish)')
+		print('\t--wordlist-en             prints list of words contained in [input file] (English)')
+		print('\t--wordlist-de             prints list of words contained in [input file] (German)')
 		print('\t--check-csv-es            prints enhanced version of cvs file [input file] (Spanish)')
 		print('\t--check-csv-en            prints enhanced version of cvs file [input file] (English)')
 		print('\t--check-csv-de            prints enhanced version of cvs file [input file] (German)')
@@ -728,6 +780,7 @@ def main(argv):
 		print('\t--word-array              prints python code with list of words from cvs file [input file]')
 		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist.py) (Spanish)')
 		print('\t--diff-csv                prints words from cvs file [diff file] that are not part of csv file [input file]')
+		print('\t--remove-dupl             prints words from cvs file [input] without duplicate rows')
 		print
 		print('Conjugation modes:')
 		print('\tPRESENTE')
@@ -757,8 +810,12 @@ def main(argv):
 	
 	analyzer = Wordanalyzer(input_file) if output_file == '-' else Wordanalyzer(input_file, output_file)
 	
-	if mode == '--wordlist':
-		analyzer.print_word_list()
+	if mode == '--wordlist-es':
+		analyzer.print_word_list('es')
+	elif mode == '--wordlist-en':
+		analyzer.print_word_list('en')
+	elif mode == '--wordlist-de':
+		analyzer.print_word_list('de')
 	elif mode == '--check-csv-es':
 		analyzer.print_enhanced_table()
 	elif mode == '--check-csv-en':
@@ -775,6 +832,8 @@ def main(argv):
 		analyzer.print_new_words()
 	elif mode == '--diff-csv':
 		analyzer.print_difference(diff_file)
+	elif mode == '--remove-dupl':
+		analyzer.print_without_duplicates()
 	else:
 		print('Invalid mode!')
 		exit(1)
