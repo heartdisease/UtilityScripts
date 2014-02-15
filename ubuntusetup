@@ -113,8 +113,8 @@ function install_anthy() {
 }
 
 function install_gnomeshell() {
-	install_nvidia
-	apt-get -y install gnome-shell gnome-tweak-tool gnome-clocks
+	#install_nvidia
+	apt-get -y install gnome-shell gnome-tweak-tool
 }
 
 ## Installs the original java (v7)
@@ -265,7 +265,7 @@ function set_configuration() {
 
 function full_setup() {
 	#disable_bluetooth
-	#add_repositories
+	add_repositories
 	apt-get update
 	
 	# install aptitude if it's not already installed
@@ -274,7 +274,7 @@ function full_setup() {
 		apt-get -y install aptitude
 	fi
 	
-	#install_gnomeshell
+	install_gnomeshell
 	install_os_essentials
 	install_mediacodecs
 	install_misc
