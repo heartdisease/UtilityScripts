@@ -14,15 +14,16 @@ import wordlist
 class CsvReader:
 	# @param separator character that separates columns
 	# @param delimiter for text (e.g. " or ')
-	def __init__(self, separator, delimiter):
+	def __init__(self, separator, delimiter, encoding = 'utf-8'):
 		self._separator = separator
 		self._delimiter = delimiter
+		self._encoding = encoding
 	#end def
 	
 	def parse(self, csvfile):
 		rows = []
 		
-		with codecs.open(csvfile, 'r', 'utf-8') as f:
+		with codecs.open(csvfile, 'r', self._encoding) as f:
 			text = f.read()
 			row = []
 			col = ''
@@ -114,12 +115,13 @@ class Translator:
 		'Accept-Language' : 'es-419,es',
 		'Content-type' : 'application/x-www-form-urlencoded; charset=utf-8'
 	}
-	WORD_PATTERN = re.compile(r'(?:(el/la|el|la) )?(\w[\w ]+)(?:, -(\w+))?')
+	WORD_PATTERN = re.compile(r'(?:(el/la|el|la) )?(\w[\w ]+)(?:, -(\w+))?', re.UNICODE)
+	ANNOTATION_PATTERN = re.compile(r' ?\[[\w\.]*\]', re.UNICODE) # detects vocabulary annotations between brackets
 	
 	# Strips all extras like annotations, articles etc.
 	@staticmethod
 	def normalize_word(word):
-		components = Translator.WORD_PATTERN.findall(re.sub(r' ?\[[\w\.]*\]', '', word), re.UNICODE)
+		components = Translator.WORD_PATTERN.findall(Translator.ANNOTATION_PATTERN.sub('', word))
 		return components[0][1] if len(components) > 0 else word
 	#end def
 	
@@ -129,18 +131,23 @@ class Translator:
 	@staticmethod
 	def resolve_word_list(string):
 		words = []
-		word_groups = Translator.WORD_PATTERN.findall(re.sub(r' ?\[[\w\.]*\]', '', string), re.UNICODE)
+		sections = Translator.ANNOTATION_PATTERN.sub('', string).split(';')
 		
-		for group in word_groups:
-			words.append(group[1])
+		for section in sections:
+			for group in Translator.WORD_PATTERN.findall(section):
+				# group[0] = article (el/la, el, la) if available, otherwise empty string
+				# group[1] = actual word
+				# group[2] = female ending if available, otherwise empty string
+				words.append(group[1])
 			
-			if len(group[2]) > 0: # generate female version if available
-				if group[1][-1] == 'o': # last letter is vowel 'o'
-					words.append(group[1][:-len(group[2])] + group[2])
-				else:
-					words.append(group[1][:-len(group[2]) + 1] + group[2])
+				if len(group[2]) > 0: # generate female version if available
+					if group[1][-1] == 'o': # last letter is vowel 'o'
+						words.append(group[1][:-len(group[2])] + group[2])
+					else:
+						words.append(group[1][:-len(group[2]) + 1] + group[2])
+					#end if
 				#end if
-			#end if
+			#end for
 		#end for
 		
 		return set(words)
@@ -334,7 +341,7 @@ class DixOsolaComConjugator(Translator):
 	#end def
 	
 	def get_conjugation(self, verb, tense):
-		p = self._pquery(word)
+		p = self._pquery(verb)
 		if p != None:
 			table_headers = p('td.contentheadcenter')
 			if len(table_headers) > tense:
@@ -646,10 +653,10 @@ class Wordanalyzer:
 	def print_word_array(self):
 		rows = Wordanalyzer.READER.parse(self._src)
 
-		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION = [\n') # print header
+		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION = sorted(set([\n') # print header
 		first_row = True
 		for row in rows:
-			for word in Wordanalyzer.resolve_word_list(row[0]):
+			for word in Translator.resolve_word_list(row[0]):
 				if first_row:
 					self._ostream.write('\t  u\'')
 					first_row = False
@@ -661,7 +668,7 @@ class Wordanalyzer:
 				self._ostream.write('\'\n')
 			#end for
 		#end for
-		self._ostream.write(']\n')
+		self._ostream.write(']))\n')
 	#end def
 	
 	def print_new_words(self):
@@ -687,6 +694,8 @@ class Wordanalyzer:
 			if normalized not in ignore:
 				self.print_csv_row(row)
 				new_count += 1
+			else:
+				print('Omit "' + word + '"')
 			#end if
 			total_count += 1
 		#end
@@ -714,6 +723,7 @@ class Wordanalyzer:
 				self.print_csv_row(row)
 			else:
 				new_count += 1
+				print('Drop duplicate "' + word + '"')
 			#end if
 			
 			total_count += 1
