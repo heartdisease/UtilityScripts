@@ -674,9 +674,11 @@ class Wordanalyzer:
 	def print_new_words(self):
 		for row in Wordanalyzer.READER.parse(self._src):
 			word = Translator.normalize_word(row[0])
+			
 			if word not in wordlist.WORD_COLLECTION:
-				self._ostream.write(word)
-				self._ostream.write('\n')
+				self.print_csv_row(row)
+			else:
+				print('Removed word %s' % word)
 			#end if
 		#end if
 	#end def
