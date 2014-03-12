@@ -391,6 +391,80 @@ class DeWiktionaryOrg(Translator):
 	
 		return { 'normalized' : word, 'ipa' : ipa, 'wordtype' : wordtype }
 	#end def
+	
+	def get_ipa(self, word):
+		ipa  = None
+		wordtype = None
+		
+		p = self._pquery(word)
+		if p != None:
+			ipa_spans = p('#mw-content-text span.ipa')
+			ipa = p(ipa_spans[0]).text() if len(ipa_spans) > 0 else ipa_spans.text()
+		#end if
+	
+		return ipa
+	#end def
+#end class
+
+class EnWiktionaryOrg(Translator):
+	def __init__(self):
+		Translator.__init__(self, u'http://en.wiktionary.org/wiki/%s')
+	#end def
+
+	def get_translation(self, word):
+		ipa  = None
+		
+		p = self._pquery(word)
+		if p != None:
+			result_block = p('#mw-content-text')
+			ipa      = result_block.find('span.IPA')
+			#wordtype = result_block.find('a[title="Hilfe:Wortart"]')
+			
+			ipa = p(ipa[0]).text() if len(ipa) > 0 else ipa.text()
+			#wordtype = p(wordtype[0]).text() if len(wordtype) > 0 else wordtype.text()
+		#end if
+	
+		return { 'normalized' : word, 'ipa' : ipa, 'wordtype' : None }
+	#end def
+	
+	def get_ipa(self, word):
+		ipa  = None
+		
+		p = self._pquery(word)
+		if p != None:
+			ipa_spans = p('#mw-content-text span.IPA')
+			ipa = p(ipa_spans[0]).text() if len(ipa_spans) > 0 else ipa_spans.text()
+		#end if
+	
+		return ipa
+	#end def
+#end class
+
+class OxfordDictionary(Translator):
+	def __init__(self):
+		Translator.__init__(self, u'http://www.oxforddictionaries.com/definition/english/%s')
+	#end def
+
+	def get_info(self, word):
+		ipa  = None
+		wordtype = None
+		
+		p = self._pquery(word)
+		if p != None:
+			ipa_span     = p('div.headpron:first').text()
+			wordtype     = p('span.partOfSpeech:first').text().strip()
+			
+			if ipa_span != None:
+				ipa_span = re.sub(r'\s*', '', ipa_span.replace('End of DIV sound audio_play_button pron-uk icon-audio', ''))
+				ipas = re.findall(r'\/(.+)\/', ipa_span)
+				if len(ipas) > 0:
+					ipa = ipas[0].replace(',', ', ')
+				#end if
+			#end if
+		#end if
+	
+		return { 'ipa' : ipa, 'wordtype' : wordtype }
+	#end def
 #end class
 
 class DictCc(Translator):
@@ -486,6 +560,18 @@ class Wordanalyzer:
 	def get_translation_de(word):
 		module = DeWiktionaryOrg()
 		return module.get_translation(word)
+	#end def
+	
+	@staticmethod
+	def get_ipa_en(word):
+		module = OxfordDictionary()
+		return module.get_info(word)['ipa']
+	#end def
+	
+	@staticmethod
+	def get_ipa_de(word):
+		module = DeWiktionaryOrg()
+		return module.get_ipa(word)
 	#end def
 	
 	@staticmethod
@@ -619,7 +705,45 @@ class Wordanalyzer:
 			if len(row) < 2:
 				print('Skip incomplete row')
 			else:
-				p = Processable(lambda word: Wordanalyzer.get_translation_de(word), row[0], row)
+				p = Processable(lambda word: Wordanalyzer.get_ipa_de(word), row[0], row)
+				p.start()
+				
+				thread_pool.add(p)
+			#end if
+		#end for
+		
+		thread_pool.finish()
+	#end def
+	
+	def print_table_with_ipa_en(self):
+		thread_pool = ThreadPool(self.__print_row_with_ipa)
+		rows = Wordanalyzer.READER.parse(self._src)
+
+		self.print_csv_row(['[Original word]', '[IPA]', '[Word type]']) # print header
+		for row in rows:
+			if len(row) < 1:
+				print('Skip incomplete row')
+			else:
+				p = Processable(lambda word: Wordanalyzer.get_ipa_en(word), row[0], row)
+				p.start()
+				
+				thread_pool.add(p)
+			#end if
+		#end for
+		
+		thread_pool.finish()
+	#end def
+	
+	def print_table_with_ipa_de(self):
+		thread_pool = ThreadPool(self.__print_row_with_ipa)
+		rows = Wordanalyzer.READER.parse(self._src)
+
+		self.print_csv_row(['[Original word]', '[IPA]', '[Word type]']) # print header
+		for row in rows:
+			if len(row) < 1:
+				print('Skip incomplete row')
+			else:
+				p = Processable(lambda word: Wordanalyzer.get_ipa_de(word), row[0], row)
 				p.start()
 				
 				thread_pool.add(p)
@@ -768,6 +892,11 @@ class Wordanalyzer:
 		self.print_csv_row(row)
 	#end def
 	
+	def __print_row_with_ipa(self, result, row):
+		row.insert(1, result if result != None else '') # result = IPA or None
+		self.print_csv_row(row)
+	#end def
+	
 	def __print_conjugation_table(self, result, row):
 		if result != None:
 			row.extend(result)
@@ -788,6 +917,8 @@ def main(argv):
 		print('\t--check-csv-es            prints enhanced version of cvs file [input file] (Spanish)')
 		print('\t--check-csv-en            prints enhanced version of cvs file [input file] (English)')
 		print('\t--check-csv-de            prints enhanced version of cvs file [input file] (German)')
+		print('\t--add-ipa-en              prints enhanced version of cvs file [input file] (English)')
+		print('\t--add-ipa-de              prints enhanced version of cvs file [input file] (German)')
 		print('\t--conjugate-verbs=[TENSE] prints table with conjugated verbs from cvs file [input file] (Spanish)')
 		print('\t--word-array              prints python code with list of words from cvs file [input file]')
 		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist.py) (Spanish)')
@@ -805,6 +936,8 @@ def main(argv):
 		
 		#trans = Wordanalyzer.get_translation_en('ludicrous')
 		#print(trans['normalized'], trans['translation'], trans['wordtype'])
+		
+		#print Wordanalyzer.get_ipa_en('gullible')
 		
 		exit(1)
 	#end if
@@ -834,6 +967,10 @@ def main(argv):
 		analyzer.print_enhanced_table_en()
 	elif mode == '--check-csv-de':
 		analyzer.print_enhanced_table_de()
+	elif mode == '--add-ipa-en':
+		analyzer.print_table_with_ipa_en()
+	elif mode == '--add-ipa-de':
+		analyzer.print_table_with_ipa_de()
 	elif mode.startswith('--conjugate-verbs='):
 		identifier = mode[18:] # 18 = length of mode string
 		tense = getattr(Wordanalyzer, identifier) # retrieve constant with reflection
