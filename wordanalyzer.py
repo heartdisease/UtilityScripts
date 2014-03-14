@@ -797,12 +797,12 @@ class Wordanalyzer:
 	
 	def print_new_words(self):
 		for row in Wordanalyzer.READER.parse(self._src):
-			word = Translator.normalize_word(row[0])
+			words = set([Translator.normalize_word(word) for word in Translator.resolve_word_list(row[0])])
 			
-			if word not in wordlist.WORD_COLLECTION:
-				self.print_csv_row(row)
+			if words <= wordlist.WORD_COLLECTION: # words is subset from WORD_COLLECTION
+				print('Removed entry %s (Normalized: %s)' % (row[0], ', '.join(words)))
 			else:
-				print('Removed word %s' % word)
+				self.print_csv_row(row)
 			#end if
 		#end if
 	#end def
