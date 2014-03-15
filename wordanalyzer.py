@@ -187,6 +187,28 @@ class Translator:
 #end
 
 class SpanishdictCom(Translator):
+	# removes duplicates (e.g. 'principal principal')
+	@staticmethod
+	def remove_duplicates(string):
+		if string == None or len(string) == 0:
+			return None
+		else:
+			parts = [word.strip() for word in string.split(' ')]
+		
+			if len(parts) >= 2:
+				for word in parts:
+					if parts[0] != word:
+						return string
+					#end if
+				#end if
+			else:
+				return string
+			#end if
+		
+			return parts[0] # if string only consists of the same words, strip all redundant ones
+		#end if
+	#end def
+	
 	def __init__(self):
 		Translator.__init__(self, u'http://www.spanishdict.com/translate/%s')
 	#end def
@@ -241,6 +263,7 @@ class SpanishdictCom(Translator):
 			if head_word != None and len(head_word) > 0:
 				normalized = head_word.strip()
 			#end if
+			normalized = SpanishdictCom.remove_duplicates(normalized)
 			
 			if wordtype == u'noun':
 				if partofspeach == None: # special case where gender declaration is missing
@@ -777,7 +800,7 @@ class Wordanalyzer:
 	def print_word_array(self):
 		rows = Wordanalyzer.READER.parse(self._src)
 
-		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION = sorted(set([\n') # print header
+		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION = set(sorted([\n') # print header
 		first_row = True
 		for row in rows:
 			for word in Translator.resolve_word_list(row[0]):
