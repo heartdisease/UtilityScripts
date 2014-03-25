@@ -359,17 +359,29 @@ class DixOsolaCom(Translator):
 #end class
 
 class DixOsolaComConjugator(Translator):
+	FORMAS_BASICAS = 0
+	IMPERATIVO = 1
+	PRESENTE = 3
+	PRETERITO_IMPERFECTO = 5
+	PRETERITO_PLUSCUAMPERFECTO = 6
+	PRETERITO_INDEFINIDO = 7
+	FUTURO_IMPERFECTO = 9
+	CONDICIONAL_SIMPLE = 11
+	PRESENTE_SUBJUNTIVO = 13
+
 	def __init__(self):
 		Translator.__init__(self, u'http://dix.osola.com/v.php?search=%s', 'iso-8859-1')
 	#end def
 	
 	def get_conjugation(self, verb, tense):
 		p = self._pquery(verb)
+		
 		if p != None:
 			table_headers = p('td.contentheadcenter')
+			
 			if len(table_headers) > tense:
 				conjugation_table = p(table_headers[tense]).parent().parent()
-				conjugation_cells = conjugation_table.find('td:last-child')
+				conjugation_cells = conjugation_table.find('td:nth-child(2)')
 				
 				tense_name = None
 				conjugations = []
@@ -544,14 +556,6 @@ class DictCc(Translator):
 #end class
 
 class Wordanalyzer:
-	PRESENTE = 3
-	PRETERITO_IMPERFECTO = 5
-	PRETERITO_PLUSCUAMPERFECTO = 6
-	PRETERITO_INDEFINIDO = 7
-	FUTURO_IMPERFECTO = 9
-	CONDICIONAL_SIMPLE = 11
-	PRESENTE_SUBJUNTIVO = 13
-	
 	CSV_SEPARATOR = ','
 	TEXT_DELIMITER = '"'
 	WORD_SPLIT_REGEX = ur'[ \t-\.,:;!\?\(\)"\'“”]'
@@ -779,8 +783,8 @@ class Wordanalyzer:
 	def print_conjugation_table(self, tenses):
 		thread_pool = ThreadPool(self.__print_conjugation_table)
 		rows = Wordanalyzer.READER.parse(self._src)
-
-		self.print_csv_row([u'[Infinitive]', u'[Tense]', u'[yo]', u'[tú]', u'[el/ella/usted]', u'[nosotros, -as]', u'[vosotros, -as]', u'[ellos/ellas/ustedes]']) # print header
+		
+		self.print_csv_row([u'[Infinitive]', u'[yo]', u'[tú]', u'[el/ella/usted]', u'[nosotros, -as]', u'[vosotros, -as]', u'[ellos/ellas/ustedes]', u'[Tense]']) # print header
 		for row in rows:
 			if len(row) < 1:
 				print('Skip incomplete row')
@@ -949,6 +953,8 @@ def main(argv):
 		print('\t--remove-dupl             prints words from cvs file [input] without duplicate rows')
 		print
 		print('Conjugation modes:')
+		print('\tFORMAS_BASICAS')
+		print('\tIMPERATIVO')
 		print('\tPRESENTE')
 		print('\tPRETERITO_IMPERFECTO')
 		print('\tPRETERITO_PLUSCUAMPERFECTO')
@@ -996,7 +1002,7 @@ def main(argv):
 		analyzer.print_table_with_ipa_de()
 	elif mode.startswith('--conjugate-verbs='):
 		identifier = mode[18:] # 18 = length of mode string
-		tense = getattr(Wordanalyzer, identifier) # retrieve constant with reflection
+		tense = getattr(DixOsolaComConjugator, identifier) # retrieve constant with reflection
 		analyzer.print_conjugation_table([tense])
 	elif mode == '--word-array':
 		analyzer.print_word_array()
