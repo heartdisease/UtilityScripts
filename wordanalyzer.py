@@ -358,6 +358,16 @@ class DixOsolaCom(Translator):
 	#end def
 #end class
 
+class SpanishDictConjugator(Translator):
+	def __init__(self):
+		Translator.__init__(self, u'http://www.spanishdict.com/conjugate/%s')
+	#end def
+	
+	def get_conjugation(self, verb, tense):
+		return None # TODO implement
+	#end def
+#end class
+
 class DixOsolaComConjugator(Translator):
 	FORMAS_BASICAS = 0
 	IMPERATIVO = 1
@@ -815,7 +825,7 @@ class Wordanalyzer:
 					self._ostream.write('\t, u\'')
 				#end if
 				
-				self._ostream.write(word)
+				self._ostream.write(word.lower())
 				self._ostream.write('\'\n')
 			#end for
 		#end for
