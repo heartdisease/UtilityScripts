@@ -11,6 +11,8 @@ import codecs
 
 import wordlist
 
+### TODO fix verb conjugation bug (yo is always last column)
+
 class CsvReader:
 	# @param separator character that separates columns
 	# @param delimiter for text (e.g. " or ')
@@ -295,7 +297,70 @@ class SpanishdictCom(Translator):
 	#end def
 #end class
 
-class DixOsolaCom(Translator):
+class DixOsolaComDe(Translator):
+	def __init__(self):
+		Translator.__init__(self, u'http://dix.osola.com/index.php?search=%s', 'iso-8859-1')
+	#end def
+	
+	##
+	# Returns a dictionary that contains the normalized version of the word, the translation and the word type (e.g. noun).
+	# 
+	# @param word to be looked up on diccionario-ingles.info
+	# @return dictionary with information about the word
+	##
+	def get_translation(self, word):
+		normalized  = None
+		translation = None
+		wordtype    = None
+		
+		p = self._pquery(word)
+		if p != None:
+			normalized  = None
+			translation = None
+			wordtype    = None
+			
+			info_rows = p('tr[id^="row_"] > td:first-child a')
+			german_rows = p('tr[id^="row_"] > td:nth-child(2)')
+			spanish_rows = p('tr[id^="row_"] > td:nth-child(3)')
+			
+			for i in range(len(spanish_rows)):
+				spanish_row = pq(spanish_rows[i]).text()
+				
+				if normalized == None:
+					#print('word: ', word, ' ', type(word))
+					#print('spanish_row: ', spanish_row, ' ', type(spanish_row))
+					
+					if word in spanish_row:
+						word_info = pq(info_rows[i]).attr('onmouseover')
+						wordtype_match = re.match(r"showinfomenu\([0-9]+,'ES','es_en',this,'\w+','[0-9]+',[0-9]+,'\w+','(\w+)'", word_info)
+						
+						if wordtype_match != None:
+							wordtype = wordtype_match.group(1)
+						normalized = spanish_row
+					else:
+						break # no translation found
+					#end if
+				elif spanish_row == normalized:
+					german_row = pq(german_rows[i]).text()
+					
+					if translation == None:
+						translation = german_row
+					else:
+						translation += u', ' + german_row
+					#end if
+				else:
+					break # found all translations
+				#end if
+			#end for
+		else:
+			print(u'Invalid response for "' + word + '".')
+		#end if
+	
+		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
+	#end def
+#end class
+
+class DixOsolaComEn(Translator):
 	def __init__(self):
 		Translator.__init__(self, u'http://www.diccionario-ingles.info/index.php?search=%s', 'iso-8859-1')
 	#end def
@@ -580,7 +645,7 @@ class Wordanalyzer:
 	
 	@staticmethod
 	def get_translation_es_2(word):
-		module = DixOsolaCom()
+		module = DixOsolaComDe()
 		return module.get_translation(word)
 	#end def
 	
@@ -704,7 +769,7 @@ class Wordanalyzer:
 			if len(row) < 2:
 				print('Skip incomplete row')
 			else:
-				p = Processable(lambda word: Wordanalyzer.get_translation_es(word), row[0], row)
+				p = Processable(lambda word: Wordanalyzer.get_translation_es_2(word), row[0], row)
 				p.start()
 				
 				thread_pool.add(p)
