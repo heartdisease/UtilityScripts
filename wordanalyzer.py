@@ -324,21 +324,19 @@ class DixOsolaComDe(Translator):
 			spanish_rows = p('tr[id^="row_"] > td:nth-child(3)')
 			
 			for i in range(len(spanish_rows)):
-				spanish_row = pq(spanish_rows[i]).text()
+				spanish_row = pq(spanish_rows[i]).text().strip()
 				
 				if normalized == None:
-					#print('word: ', word, ' ', type(word))
-					#print('spanish_row: ', spanish_row, ' ', type(spanish_row))
+					print('word: %s [%s]' % (word, type(word)))
+					print('spanish_row: %s [%s]' % (spanish_row, type(spanish_row)))
 					
-					if word in spanish_row:
+					if word == spanish_row: # word is sole translation in this row
 						word_info = pq(info_rows[i]).attr('onmouseover')
-						wordtype_match = re.match(r"showinfomenu\([0-9]+,'ES','es_en',this,'\w+','[0-9]+',[0-9]+,'\w+','(\w+)'", word_info)
+						wordtype_match = re.match(r"showinfomenu\([0-9]+,'DE','de_es',this,'\w+','[0-9]+',[0-9]+,'\w+','(\w+)'", word_info)
 						
 						if wordtype_match != None:
 							wordtype = wordtype_match.group(1)
 						normalized = spanish_row
-					else:
-						break # no translation found
 					#end if
 				elif spanish_row == normalized:
 					german_row = pq(german_rows[i]).text()
@@ -387,7 +385,7 @@ class DixOsolaComEn(Translator):
 			english_rows = p('tr[id^="row_"] > td:nth-child(3)')
 			
 			for i in range(len(spanish_rows)):
-				spanish_row = pq(spanish_rows[i]).text()
+				spanish_row = pq(spanish_rows[i]).text().strip().replace('&nbsp;', ' ')
 				
 				if normalized == None:
 					#print('word: ', word, ' ', type(word))
@@ -443,6 +441,7 @@ class DixOsolaComConjugator(Translator):
 	FUTURO_IMPERFECTO = 9
 	CONDICIONAL_SIMPLE = 11
 	PRESENTE_SUBJUNTIVO = 13
+	PRETERITO_IMPERFECTO_SUBJUNTIVO = 15
 
 	def __init__(self):
 		Translator.__init__(self, u'http://dix.osola.com/v.php?search=%s', 'iso-8859-1')
@@ -636,6 +635,21 @@ class Wordanalyzer:
 	WORD_SPLIT_REGEX = ur'[ \t-\.,:;!\?\(\)"\'“”]'
 	READER = CsvReader(CSV_SEPARATOR, TEXT_DELIMITER)
 	DICT_CC_MODULE = None
+	SPANISH_TO_GERMAN = [ # any occurance of the letter x will not be replaced due to the unpredictability of its pronounciation (h and y need special treatment)
+		(u'ch', u'tsch'), (u'cc', u'ks'), (u'j', u'ch'), (u'ñ', u'nj'), (u'll', u'j'), (u'v', u'b'), (u'z', u's'),
+		(u'ca', u'ka'), (u'cá', u'ká'), (u'co', u'ko'), (u'có', u'kó'), (u'cu', u'ku'), (u'cú', u'kú'),
+		(u'ce', u'se'), (u'cé', u'sé'), (u'ci', u'si'), (u'cí', u'sí'),
+		(u'que', u'ke'), (u'qué', u'ké'), (u'qui', u'ki'), (u'quí', u'kí'),
+		(u'ge', u'che'), (u'gé', u'ché'), (u'gi', u'chi'), (u'gí', u'chí'),
+		(u'gue', u'ge'), (u'gué', u'gé'), (u'gui', u'gi'), (u'guí', u'gí'),
+		(u'güe', u'gue'), (u'güé', u'gué'), (u'güi', u'gui'), (u'güí', u'guí'),
+		(u'eu', u'e·u'), (u'éu', u'é·u'), (u'eú', u'e·ú'),
+		(u'ei', u'e·i'), (u'éi', u'é·i'), (u'eí', u'e·í'),
+		(u'ie', u'i·e'), (u'íe', u'í·e'), (u'ié', u'i·é')
+	]
+	ACCENT_CONVERSION = {
+		u'a' : u'á', u'e' : u'é', u'i' : u'í', u'o' : u'ó', u'u' : u'ú'
+	}
 	
 	@staticmethod
 	def get_translation_es(word):
@@ -644,7 +658,7 @@ class Wordanalyzer:
 	#end def
 	
 	@staticmethod
-	def get_translation_es_2(word):
+	def get_translation_es2(word):
 		module = DixOsolaComDe()
 		return module.get_translation(word)
 	#end def
@@ -674,6 +688,69 @@ class Wordanalyzer:
 	def get_ipa_de(word):
 		module = DeWiktionaryOrg()
 		return module.get_ipa(word)
+	#end def
+	
+	@staticmethod
+	def has_accent(word):
+		for char in word:
+			if char == u'á' or char == u'é' or char == u'í' or char == u'ó' or char == u'ú':
+				return True
+			#end if
+		#end for
+		
+		return False
+	#end def
+	
+	@staticmethod
+	def is_vowel(char):
+		return char == u'a' or char == u'e' or char == u'i' or char == u'o' or char == u'u'
+	#end def
+	
+	@staticmethod
+	def add_accent_es(word):
+		if Wordanalyzer.has_accent(word):
+			return word
+		#end if
+		
+		last_char = word[-1]
+		consonants = 0
+		chars = list(word)
+		for i, char in reversed(list(enumerate(chars))):
+			if Wordanalyzer.is_vowel(char):
+				if last_char == u'n' or last_char == u's':
+					if consonants > 1:
+						chars[i] = Wordanalyzer.ACCENT_CONVERSION[char]
+						break
+					#end if
+				elif consonants > 0:
+					chars[i] = Wordanalyzer.ACCENT_CONVERSION[char]
+					break
+				#end if
+			else:
+				consonants += 1
+			#end if
+		#end for
+		
+		return u''.join(chars)
+	#end def
+	
+	@staticmethod
+	def spanish_to_phonetic_de(word):
+		#phonetics = u' '.join([Wordanalyzer.add_accent_es(word) for word in re.split(ur'[ \/\(\)\[\]¡!¿?;\.:_-]', re.sub(ur'(?:[^c])h', u'', word.lower())) if len(word) > 0])
+		phonetics = re.sub(ur'(?:[^c])h', u'', word.lower())
+		words_with_accents = [(word, Wordanalyzer.add_accent_es(word)) for word in re.findall(r'(?u)\w+', phonetics)]
+		
+		for word_pair in words_with_accents:
+			if word_pair[0] != word_pair[1]:
+				phonetics = phonetics.replace(word_pair[0], word_pair[1])
+			#end if
+		#end for
+		
+		for conversion in Wordanalyzer.SPANISH_TO_GERMAN:
+			phonetics = phonetics.replace(conversion[0], conversion[1])
+		#end for
+		
+		return re.sub(ur'y ', 'i ', re.sub(ur'y$', 'i', phonetics)).replace(u'y', u'j')
 	#end def
 	
 	@staticmethod
@@ -769,7 +846,7 @@ class Wordanalyzer:
 			if len(row) < 2:
 				print('Skip incomplete row')
 			else:
-				p = Processable(lambda word: Wordanalyzer.get_translation_es_2(word), row[0], row)
+				p = Processable(lambda word: Wordanalyzer.get_translation_es(word), row[0], row)
 				p.start()
 				
 				thread_pool.add(p)
@@ -854,6 +931,21 @@ class Wordanalyzer:
 		
 		thread_pool.finish()
 	#end def
+	
+	def print_table_with_phonetics_es(self):
+		rows = Wordanalyzer.READER.parse(self._src)
+		
+		self.print_csv_row(['[Original word]', '[Pronounciation]', '[Translation]', '[Word type]']) # print header
+		for row in rows:
+			if len(row) < 1:
+				print('Skip incomplete row')
+			else:
+				row.insert(1, Wordanalyzer.spanish_to_phonetic_de(row[0]))
+				self.print_csv_row(row)
+			#end if
+		#end for
+	#end def
+	
 	
 	def print_conjugation_table(self, tenses):
 		thread_pool = ThreadPool(self.__print_conjugation_table)
@@ -1019,8 +1111,9 @@ def main(argv):
 		print('\t--check-csv-es            prints enhanced version of cvs file [input file] (Spanish)')
 		print('\t--check-csv-en            prints enhanced version of cvs file [input file] (English)')
 		print('\t--check-csv-de            prints enhanced version of cvs file [input file] (German)')
-		print('\t--add-ipa-en              prints enhanced version of cvs file [input file] (English)')
-		print('\t--add-ipa-de              prints enhanced version of cvs file [input file] (German)')
+		print('\t--add-ipa-en              prints enhanced version of cvs file [input file] including IPA annotations (English)')
+		print('\t--add-ipa-de              prints enhanced version of cvs file [input file] including IPA annotations (German)')
+		print('\t--add-phonetic-es         prints enhanced version of cvs file [input file] including annotations for pronounciation in German (Spanish)')
 		print('\t--conjugate-verbs=[TENSE] prints table with conjugated verbs from cvs file [input file] (Spanish)')
 		print('\t--word-array              prints python code with list of words from cvs file [input file]')
 		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist.py) (Spanish)')
@@ -1037,11 +1130,14 @@ def main(argv):
 		print('\tFUTURO_IMPERFECTO')
 		print('\tCONDICIONAL_SIMPLE')
 		print('\tPRESENTE_SUBJUNTIVO')
+		print('\tPRETERITO_IMPERFECTO_SUBJUNTIVO')
 		
 		#trans = Wordanalyzer.get_translation_en('ludicrous')
 		#print(trans['normalized'], trans['translation'], trans['wordtype'])
 		
 		#print Wordanalyzer.get_ipa_en('gullible')
+		
+		print(Wordanalyzer.add_accent_es('mojado'))
 		
 		exit(1)
 	#end if
@@ -1075,6 +1171,8 @@ def main(argv):
 		analyzer.print_table_with_ipa_en()
 	elif mode == '--add-ipa-de':
 		analyzer.print_table_with_ipa_de()
+	elif mode == '--add-phonetic-es':
+		analyzer.print_table_with_phonetics_es()
 	elif mode.startswith('--conjugate-verbs='):
 		identifier = mode[18:] # 18 = length of mode string
 		tense = getattr(DixOsolaComConjugator, identifier) # retrieve constant with reflection
