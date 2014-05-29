@@ -807,7 +807,7 @@ class Wordanalyzer:
 			translation_lambda = None
 			
 			if lang == 'es':
-				words = sorted(wordset - wordlist_esWORD_COLLECTION)
+				words = sorted(wordset - wordlist_es.WORD_COLLECTION_ES)
 			elif lang == 'de':
 				words = sorted(wordset)
 			elif lang == 'en':
@@ -998,7 +998,7 @@ class Wordanalyzer:
 		for row in Wordanalyzer.READER.parse(self._src):
 			words = set([Translator.normalize_word(word) for word in Translator.resolve_word_list(row[0])])
 			
-			if words <= wordlist_esWORD_COLLECTION_ES: # words is subset from WORD_COLLECTION
+			if words <= wordlist_es.WORD_COLLECTION_ES: # words is subset from WORD_COLLECTION
 				print('Removed entry %s (Normalized: %s)' % (row[0], ', '.join(words)))
 			else:
 				self.print_csv_row(row)
@@ -1121,7 +1121,7 @@ def main(argv):
 		print('\t--add-phonetic-es         prints enhanced version of cvs file [input file] including annotations for pronounciation in German (Spanish)')
 		print('\t--conjugate-verbs=[TENSE] prints table with conjugated verbs from cvs file [input file] (Spanish)')
 		print('\t--word-array              prints python code with list of words from cvs file [input file]')
-		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist_espy) (Spanish)')
+		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist_es.py) (Spanish)')
 		print('\t--diff-csv                prints words from cvs file [diff file] that are not part of csv file [input file]')
 		print('\t--remove-dupl             prints words from cvs file [input] without duplicate rows')
 		print
