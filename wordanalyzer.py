@@ -9,7 +9,7 @@ import urllib
 import urllib2
 import codecs
 
-import wordlist
+import wordlist_es
 
 ### TODO fix verb conjugation bug (yo is always last column)
 
@@ -279,8 +279,13 @@ class SpanishdictCom(Translator):
 					elif is_masculine:
 						normalized = u'el ' + normalized
 					elif is_feminine:
-						normalized = u'la ' + normalized
-					else: # special case where gender declaration is missing
+						# use article 'el' if noun starts with a-sound
+						if normalized.startswith(u'a') or normalized.startswith(u'ha'):
+							normalized = u'el ' + normalized + ' {f}'
+						else:
+							normalized = u'la ' + normalized
+						#end if
+					else: # special case where gender declaration is missing (add manually)
 						normalized = u'?? ' + normalized
 					#end if
 				#end if
@@ -802,7 +807,7 @@ class Wordanalyzer:
 			translation_lambda = None
 			
 			if lang == 'es':
-				words = sorted(wordset - wordlist.WORD_COLLECTION)
+				words = sorted(wordset - wordlist_esWORD_COLLECTION)
 			elif lang == 'de':
 				words = sorted(wordset)
 			elif lang == 'en':
@@ -933,7 +938,7 @@ class Wordanalyzer:
 	#end def
 	
 	def print_table_with_phonetics_es(self):
-		rows = Wordanalyzer.READER.parse(self._src)
+		rows = Wordanalyzer.READER.parse(self._src) # TODO implement sillable separator class
 		
 		self.print_csv_row(['[Original word]', '[Pronounciation]', '[Translation]', '[Word type]']) # print header
 		for row in rows:
@@ -993,7 +998,7 @@ class Wordanalyzer:
 		for row in Wordanalyzer.READER.parse(self._src):
 			words = set([Translator.normalize_word(word) for word in Translator.resolve_word_list(row[0])])
 			
-			if words <= wordlist.WORD_COLLECTION: # words is subset from WORD_COLLECTION
+			if words <= wordlist_esWORD_COLLECTION_ES: # words is subset from WORD_COLLECTION
 				print('Removed entry %s (Normalized: %s)' % (row[0], ', '.join(words)))
 			else:
 				self.print_csv_row(row)
@@ -1116,7 +1121,7 @@ def main(argv):
 		print('\t--add-phonetic-es         prints enhanced version of cvs file [input file] including annotations for pronounciation in German (Spanish)')
 		print('\t--conjugate-verbs=[TENSE] prints table with conjugated verbs from cvs file [input file] (Spanish)')
 		print('\t--word-array              prints python code with list of words from cvs file [input file]')
-		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist.py) (Spanish)')
+		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist_espy) (Spanish)')
 		print('\t--diff-csv                prints words from cvs file [diff file] that are not part of csv file [input file]')
 		print('\t--remove-dupl             prints words from cvs file [input] without duplicate rows')
 		print
@@ -1137,7 +1142,7 @@ def main(argv):
 		
 		#print Wordanalyzer.get_ipa_en('gullible')
 		
-		print(Wordanalyzer.add_accent_es('mojado'))
+		#print(Wordanalyzer.add_accent_es('mojado'))
 		
 		exit(1)
 	#end if
