@@ -228,44 +228,24 @@ class SpanishdictCom(Translator):
 		
 		p = self._pquery(word)
 		if p != None:
-			result_block = p('div.results-block')
-			normalized   = result_block.find('h1.word').text()
-			translation  = result_block.find('h2.quick_def').text()
-			wordtype     = result_block.find('div.hw-block > span.quick_pos').text()
-			partofspeach = result_block.find('span.part_of_speech:first-child').text()
+			result_block = p('div.translate.card')
+			normalized   = result_block.find('div.quickdef > div.source > h1').text()
+			translation  = result_block.find('div.quickdef > div.lang > div.el').text()
+			partofspeach = result_block.find('span.part_of_speech:first').text()
+			wordtype     = partofspeach if partofspeach == None or not u' ' in partofspeach else partofspeach.split(u' ')[-1]
 			head_word    = result_block.find('div.dictionary_word > span.head_word').text()
-			
-			is_masculine = False
-			is_feminine  = False
 			
 			if partofspeach != None:
 				partofspeach = partofspeach.strip() # remove trailing white spaces
-		
-				if wordtype == None or len(wordtype) == 0:
-					is_probably_noun = u'noun' in partofspeach
-					is_masculine = partofspeach.startswith(u'masculine') and is_probably_noun
-					is_feminine  = partofspeach.startswith(u'feminine') and is_probably_noun
-				
-					# fix for inconsistency of the website
-					if is_masculine or is_feminine: # word is a noun
-						wordtype = u'noun'
-					else:
-						first_word = re.match(r'\w+', partofspeach) # find first word type
-			
-						if first_word != None:
-							wordtype = first_word.group(0)
-						#end if
-					#end if
-				else:
-					wordtype = wordtype.strip() # remove trailing white spaces
-				#end if
 			#end if
 			
-			# head_word offers more detailed description of the noun (like 'chico, -a')
+			# head_word offers more detailed description of the noun or adjective (like 'chico, -a')
 			if head_word != None and len(head_word) > 0:
 				normalized = head_word.strip()
+			elif normalized != None:
+				normalized = normalized.strip()
 			#end if
-			normalized = SpanishdictCom.remove_duplicates(normalized)
+			#normalized = SpanishdictCom.remove_duplicates(normalized)
 			
 			if wordtype == u'noun':
 				if partofspeach == None: # special case where gender declaration is missing
@@ -279,7 +259,7 @@ class SpanishdictCom(Translator):
 					elif is_masculine:
 						normalized = u'el ' + normalized
 					elif is_feminine:
-						# use article 'el' if noun starts with a-sound
+						# use article 'el' if noun starts with a-sound (still buggy!)
 						if normalized.startswith(u'a') or normalized.startswith(u'ha'):
 							normalized = u'el ' + normalized + ' {f}'
 						else:
@@ -297,6 +277,19 @@ class SpanishdictCom(Translator):
 		else:
 			print(u'Invalid response for "' + word + '".')
 		#end if
+		
+		# translate english word type to spanish
+		if wordtype == u'noun':
+			wordtype = u'sustantivo'
+		elif wordtype == u'verb':
+			wordtype = u'verbo'
+		elif wordtype == u'adjective':
+			wordtype = u'adjetivo'
+		elif wordtype == u'adverb':
+			wordtype = u'adverbio'
+		elif wordtype == u'pronoun':
+			wordtype = u'pronombre'
+		#endif
 	
 		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
 	#end def
