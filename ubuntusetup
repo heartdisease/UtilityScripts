@@ -29,7 +29,9 @@ function add_ppa() {
 	# PPA for VLC player
 	add-apt-repository -y ppa:videolan/stable-daily
 	# PPA for GTK+ themes (WebUpd8)
-	add-apt-repository -y ppa:webupd8team/themes
+	#add-apt-repository -y ppa:webupd8team/themes
+	# PPA for Tor-Brower-Bundle
+	add-apt-repository -y ppa:webupd8team/tor-browser
 	# PPA for Guayadeque media player
 	add-apt-repository -y ppa:anonbeat/guayadeque
 	# PPA for ffmpeg
@@ -37,10 +39,7 @@ function add_ppa() {
 }
 
 # this function is only used by add_repositories()
-function add_apt_keys() {s
-	# key for TOR
-	gpg --keyserver keys.gnupg.net --recv 886DDD89
-	gpg --export A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89 | apt-key add -
+function add_apt_keys() {
 	# key for VirtualBox
 	wget -q http://download.virtualbox.org/virtualbox/debian/oracle_vbox.asc -O- | sudo apt-key add -
 }
@@ -52,9 +51,6 @@ function add_apt_sources() {
 	echo "# libdvdcss2 REPO" >> $apt_sources
 	echo "deb http://download.videolan.org/pub/debian/stable/ /" >> $apt_sources
 	echo "deb-src http://download.videolan.org/pub/debian/stable/ /" >> $apt_sources
-	echo >> $apt_sources
-	echo "# TOR" >> $apt_sources
-	echo "deb http://deb.torproject.org/torproject.org $VERSION_CODE_NAME main" >> $apt_sources
 	echo >> $apt_sources
 	#echo "# VIRTUALBOX" >> $apt_sources
 	#echo "deb http://download.virtualbox.org/virtualbox/debian $VERSION_CODE_NAME contrib" >> $apt_sources
@@ -77,14 +73,10 @@ function install_os_essentials() {
 	apt-get -y install nautilus-open-terminal libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans libreoffice-presenter-console libreoffice-presentation-minimizer
 }
 
-# install different useful tools
+# install different useful tools that are not provided by default
 function install_misc() {
-	#apt-get -y remove empathy gwibber openjdk-6-jre openjdk-6-jre-headless # remove unused components
-	apt-get -y install wine rar p7zip inkscape gimp gthumb filezilla pidgin kanjipad vlc fonts-sil-gentium msttcorefonts gparted alacarte optipng
-}
-
-function install_anthy() {
-	apt-get -y install anthy ibus-anthy language-pack-ja language-pack-ja-base language-pack-gnome-ja-base language-pack-gnome-ja
+	apt-get -y remove empathy # remove unused components
+	apt-get -y install wine rar p7zip inkscape gimp gthumb filezilla pidgin tor-browser kanjipad vlc fonts-sil-gentium msttcorefonts gparted alacarte optipng
 }
 
 function install_gnomeshell() {
@@ -92,7 +84,11 @@ function install_gnomeshell() {
 }
 
 function install_latex() {
-	apt-get -y install libreoffice-writer2latex texlive-latex-base
+	apt-get -y install libreoffice-writer2latex texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-extra-utils
+}
+
+function install_anthy() {
+	apt-get -y install anthy ibus-anthy language-pack-ja language-pack-ja-base language-pack-gnome-ja-base language-pack-gnome-ja
 }
 
 ## Installs the original java (v7)
@@ -247,7 +243,8 @@ function full_setup() {
 	install_os_essentials
 	install_mediacodecs
 	install_misc
-	install_anthy # install japanese extensions
+	#install_anthy # install japanese extensions
+	#install_latex # install texlive environment
 
 	apt-get --force-yes -y dist-upgrade # update packages
 }
@@ -283,5 +280,5 @@ else
 	echo "	--full-setup	-	Installs and configures several components for a fresh installation"
 	echo "	--install-java	-	Installs Oracle Java (not recommended)"
 	echo "	--set-config	-	Sets a useful basic configuration (only execute for target user - no root)"
-	echo "	--install-tor	-	Installs and configures Tor+Polipo (execute --full-setup first)"
+	echo "	--install-tor	-	Installs and configures Tor+Polipo (execute --full-setup first) [Deprecated: used tor-browser instead]"
 fi
