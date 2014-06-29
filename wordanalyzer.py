@@ -1059,11 +1059,15 @@ class Wordanalyzer:
 	#end def
 	
 	def __print_enhanced_row(self, result, row):
-		normalized  = u'unknown' if result['normalized'] == None else result['normalized']
-		translation = u'unknown' if result['translation'] == None else \
-								u'{duplicate} '+result['translation'] if result['translation'] in row[1] \
-								else result['translation']
+		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
+		translation = result['translation']
 		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
+		
+		if translation == None:
+			translation = u'{unknown}'
+		elif len(translation) > 0 and translation in row[1]:
+			translation = u'{duplicate} ' + translation
+		#endif
 
 		row.insert(1, normalized)
 		row.insert(2, translation)
