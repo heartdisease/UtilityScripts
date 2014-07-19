@@ -627,6 +627,144 @@ class DictCc(Translator):
 	#end def
 #end class
 
+class SpanishWordAnalyser:
+	SPANISH_TO_GERMAN = [ # any occurance of the letter x will not be replaced due to the unpredictability of its pronounciation (h and y need special treatment)
+		(u'ch', u'tsch'), (u'cc', u'ks'), (u'j', u'ch'), (u'ñ', u'nj'), (u'll', u'j'), (u'v', u'b'), (u'z', u's'),
+		(u'ca', u'ka'), (u'cá', u'ká'), (u'co', u'ko'), (u'có', u'kó'), (u'cu', u'ku'), (u'cú', u'kú'),
+		(u'ce', u'se'), (u'cé', u'sé'), (u'ci', u'si'), (u'cí', u'sí'),
+		(u'que', u'ke'), (u'qué', u'ké'), (u'qui', u'ki'), (u'quí', u'kí'),
+		(u'ge', u'che'), (u'gé', u'ché'), (u'gi', u'chi'), (u'gí', u'chí'),
+		(u'gue', u'ge'), (u'gué', u'gé'), (u'gui', u'gi'), (u'guí', u'gí'),
+		(u'güe', u'gue'), (u'güé', u'gué'), (u'güi', u'gui'), (u'güí', u'guí'),
+		(u'eu', u'e·u'), (u'éu', u'é·u'), (u'eú', u'e·ú'),
+		(u'ei', u'e·i'), (u'éi', u'é·i'), (u'eí', u'e·í'),
+		(u'ie', u'i·e'), (u'íe', u'í·e'), (u'ié', u'i·é')
+	]
+	ACCENT_CONVERSION = {
+		u'a' : u'á', u'e' : u'é', u'i' : u'í', u'o' : u'ó', u'u' : u'ú'
+	}
+
+	def __init__(self, word):
+		self._word = word
+		self._syllables = None
+		self._stressed = -1 # index of stressed syllable
+	#end def
+	
+	def phonetic_de(self):
+		#phonetics = u' '.join([Wordanalyzer.add_accent_es(word) for word in re.split(ur'[ \/\(\)\[\]¡!¿?;\.:_-]', re.sub(ur'(?:[^c])h', u'', word.lower())) if len(word) > 0])
+		phonetics = re.sub(ur'(?:[^c])h', u'', self._word.lower())
+		words_with_accents = [(self._word, SpanishWordAnalyser.__add_accent(word)) for self._word in re.findall(r'(?u)\w+', phonetics)]
+		
+		for word_pair in words_with_accents:
+			if word_pair[0] != word_pair[1]:
+				phonetics = phonetics.replace(word_pair[0], word_pair[1])
+			#end if
+		#end for
+		
+		for conversion in SpanishWordAnalyser.SPANISH_TO_GERMAN:
+			phonetics = phonetics.replace(conversion[0], conversion[1])
+		#end for
+		
+		return re.sub(ur'y ', 'i ', re.sub(ur'y$', 'i', phonetics)).replace(u'y', u'j')
+	#end def
+	
+	def syllables(self):
+		if self._syllables == None:
+			self._analyse()
+		#end if
+		
+		return self._syllables
+	#end def
+	
+	def stressed_syllable(self):
+		if self._stressed == -1:
+			self._analyse()
+		#end if
+		
+		return self._stressed
+	#end def
+	
+	def word(self):
+		return self._word
+	#end def
+	
+	@staticmethod
+	def is_vowel(char):
+		return char == u'a' or char == u'e' or char == u'i' or char == u'o' or char == u'u' \
+			or char == u'á' or char == u'é' or char == u'í' or char == u'ó' or char == u'ú'
+	#end def
+	
+	@staticmethod
+	def has_accent(char):
+		return char == u'á' or char == u'é' or char == u'í' or char == u'ó' or char == u'ú'
+	#end def
+	
+	@staticmethod
+	def contains_accent(word):
+		for char in word:
+			if char == u'á' or char == u'é' or char == u'í' or char == u'ó' or char == u'ú':
+				return True
+			#end if
+		#end for
+		
+		return False
+	#end def
+	
+	# TODO implement all rules!
+	def _analyse(self):
+		self._syllables = []
+		syllable = ''
+		
+		for c in self._word:
+			if len(syllable) == 0:
+				syllable += c
+			else:
+				if SpanishWordAnalyser.is_vowel(c):
+					if c == u'i' or c == u'u':
+						syllable += c
+					else:
+						self._syllables.push(syllable)
+						syllable = c
+					#end if
+				else: # character is a consonant
+					syllable += c # highly inaccurate!
+					# TODO!
+				#end if
+			#end if
+		#end for
+		
+		self._syllables.push(syllable)
+	#end def
+	
+	@staticmethod
+	def __add_accent(word):
+		if Wordanalyzer.contains_accent(word):
+			return word
+		#end if
+		
+		last_char = word[-1]
+		consonants = 0
+		chars = list(word)
+		for i, char in reversed(list(enumerate(chars))):
+			if Wordanalyzer.is_vowel(char):
+				if last_char == u'n' or last_char == u's':
+					if consonants > 1:
+						chars[i] = Wordanalyzer.ACCENT_CONVERSION[char]
+						break
+					#end if
+				elif consonants > 0:
+					chars[i] = Wordanalyzer.ACCENT_CONVERSION[char]
+					break
+				#end if
+			else:
+				consonants += 1
+			#end if
+		#end for
+		
+		return u''.join(chars)
+	#end def
+#end class
+
 class Wordanalyzer:
 	CSV_SEPARATOR = ','
 	TEXT_DELIMITER = '"'
