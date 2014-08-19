@@ -17,58 +17,164 @@ class CsvRow:
 	def __init__(self, values, format_str):
 		self._values = values
 		self._format = format_str.split('|')
-		
-		for i, col in enumerate(self._format):			
-			if i >= len(self._values):
-				break
-			elif col == 'O':
-				self.original_word = self._values[i]
-			elif col == 'P':
-				self.ipa = self._values[i]
-			elif col == 'S':
-				self.synonyms = self._values[i]
-			elif col == 'A':
-				self.antonyms = self._values[i]
-			elif col == 'E':
-				self.example_sentence = self._values[i]
-			elif col == 'D':
-				self.definition = self._values[i]
-			elif col == 'M':
-				self.translation = self._values[i]
-			elif col == 'W':
-				self.word_type = self._values[i]
-			elif col == 'L':
-				self.level = self._values[i]
-			elif col == 'T':
-				self.tags = self._values[i]
+	#end def
+	
+	@property
+	def original_word(self):
+		return self._values[self._format.index('O')]
+	#end def
+	
+	@original_word.setter
+	def original_word(self, value):
+		self._values[self._format.index('O')] = value
+	#end def
+	
+	@property
+	def ipa(self):
+		return self._values[self._format.index('P')]
+	#end def
+	
+	@ipa.setter
+	def ipa(self, value):
+		self._values[self._format.index('P')] = value
+	#end def
+	
+	@property
+	def synonyms(self):
+		return self._values[self._format.index('S')]
+	#end def
+	
+	@synonyms.setter
+	def synonyms(self, value):
+		self._values[self._format.index('S')] = value
+	#end def
+	
+	@property
+	def antonyms(self):
+		return self._values[self._format.index('A')]
+	#end def
+	
+	@antonyms.setter
+	def antonyms(self, value):
+		self._values[self._format.index('A')] = value
+	#end def
+	
+	@property
+	def example_sentence(self):
+		return self._values[self._format.index('E')]
+	#end def
+	
+	@example_sentence.setter
+	def example_sentence(self, value):
+		self._values[self._format.index('E')] = value
+	#end def
+	
+	@property
+	def definition(self):
+		return self._values[self._format.index('D')]
+	#end def
+	
+	@definition.setter
+	def definition(self, value):
+		self._values[self._format.index('D')] = value
+	#end def
+	
+	@property
+	def translation(self):
+		return self._values[self._format.index('M')]
+	#end def
+	
+	@translation.setter
+	def translation(self, value):
+		self._values[self._format.index('M')] = value
+	#end def
+	
+	@property
+	def word_type(self):
+		return self._values[self._format.index('W')]
+	#end def
+	
+	@word_type.setter
+	def word_type(self, value):
+		self._values[self._format.index('W')] = value
+	#end def
+	
+	@property
+	def level(self):
+		return self._values[self._format.index('L')]
+	#end def
+	
+	@level.setter
+	def level(self, value):
+		self._values[self._format.index('L')] = value
+	#end def
+	
+	@property
+	def tags(self):
+		return self._values[self._format.index('T')]
+	#end def
+	
+	@tags.setter
+	def tags(self, value):
+		self._values[self._format.index('T')] = value
+	#end def
+	
+	### SPECIAL PROPERTIES ###
+	
+	@property
+	def normalized_word(self):
+		return self._values[self._format.index('N')]
+	#end def
+	
+	@normalized_word.setter
+	def normalized_word(self, normalized):
+		if 'N' in self._format:
+			self._values[self._format.index('N')] = normalized
+		else:
+			index = self._format.index('O') + 1
+			
+			if len(self._values) > index:
+				self._format.insert(index, 'N') # N = normalized
+				self._values.insert(index, normalized)
 			#end if
-		#end for
-	#end def
-	
-	def set_normalized_word(self, normalized):
-		index = self._format.index('O') + 1
-		
-		if len(self._values) > index:
-			self._format.insert(index, 'N') # N = normalized
-			self._values.insert(index, normalized)
 		#end if
 	#end def
 	
-	def set_new_translation(self, translation):
-		index = self._format.index('M') + 1
+	@property
+	def new_translation(self):
+		return self._values[self._format.index('N')]
+	#end def
+	
+	@new_translation.setter
+	def new_translation(self, translation):
+		if 'NM' in self._format:
+			self._values[self._format.index('NM')] = translation
+		else:
+			index = self._format.index('M') + 1
 		
-		if len(self._values) > index:
-			self._format.insert(index, 'NM') # NM = new meaning/translation
-			self._values.insert(index, translation)
+			if len(self._values) > index:
+				self._format.insert(index, 'NM') # NM = new meaning/translation
+				self._values.insert(index, translation)
+			#end if
 		#end if
 	#end def
 	
-	def set_new_wordtype(self, wordtype):
-		index = self._format.index('W') + 1
+	@property
+	def new_wordtype(self):
+		return self._values[self._format.index('NW')]
+	#end def
+	
+	@new_wordtype.setter
+	def new_wordtype(self, wordtype):
+		if 'NW' in self._format:
+			self._values[self._format.index('NW')] = normalized
+		else:
+			index = self._format.index('W') + 1
 		
-		if len(self._values) > index:
-			self._format.insert(index, 'NW') # NW = new word type
-			self._values.insert(index, wordtype)
+			if len(self._values) > index:
+				self._format.insert(index, 'NW') # NW = new word type
+				self._values.insert(index, wordtype)
+			#end if
 		#end if
 	#end def
 	
@@ -988,6 +1094,11 @@ class Wordanalyzer:
 		return module.get_conjugation(verb, tense)
 	#end def
 	
+	@staticmethod
+	def get_normalized_words(rows):
+		return set([Translator.normalize_word(row.original_word) for row in rows])
+	#end def
+	
 	def __init__(self, src, out = None):
 		self._src = src
 		self._ostream = sys.stdout if out == None else codecs.open(out, 'w', 'utf-8')
@@ -1174,7 +1285,7 @@ class Wordanalyzer:
 	#end def
 	
 	def print_table_with_phonetics_es(self):
-		rows = self._parse_src() # TODO implement sillable separator class
+		rows = self._parse_src()
 		
 		self.print_csv_row(['[Original word]', '[Pronounciation]', '[Translation]', '[Word type]']) # print header
 		for row in rows:
@@ -1198,7 +1309,7 @@ class Wordanalyzer:
 				print('Skip incomplete row')
 			else:
 				for tense in tenses:
-					p = Processable(lambda word: Wordanalyzer.get_conjugation_es(word, tense), row[0], row)
+					p = Processable(lambda word: Wordanalyzer.get_conjugation_es(word, tense), row.original_word, row)
 					p.start()
 				
 					thread_pool.add(p)
@@ -1215,7 +1326,7 @@ class Wordanalyzer:
 		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION = set(sorted([\n') # print header
 		first_row = True
 		for row in rows:
-			for word in Translator.resolve_word_list(row[0]):
+			for word in Translator.resolve_word_list(row.original_word):
 				if first_row:
 					self._ostream.write('\t  u\'')
 					first_row = False
@@ -1232,10 +1343,10 @@ class Wordanalyzer:
 	
 	def print_new_words(self):
 		for row in self._parse_src():
-			words = set([Translator.normalize_word(word) for word in Translator.resolve_word_list(row[0])])
+			words = set([Translator.normalize_word(word) for word in Translator.resolve_word_list(row.original_word)])
 			
 			if words <= wordlist_es.WORD_COLLECTION_ES: # words is subset from WORD_COLLECTION
-				print('Removed entry %s (Normalized: %s)' % (row[0], ', '.join(words)))
+				print('Removed entry %s (Normalized: %s)' % (row.original_word, ', '.join(words)))
 			else:
 				self.print_csv_row(row)
 			#end if
@@ -1246,10 +1357,10 @@ class Wordanalyzer:
 	def print_difference(self, newfile):
 		total_count = 0
 		new_count   = 0
-		ignore = [(row[0][3:] if row[0].startswith('to ') else row[0]).strip().lower() for row in self._parse_src()]
+		ignore = [(row.original_word[3:] if row.original_word.startswith('to ') else row.original_word).strip().lower() for row in self._parse_src()]
 		
 		for row in self._reader.parse(newfile):
-			word = row[0].strip().lower()
+			word = row.original_word.strip().lower()
 			normalized = word[3:] if word.startswith('to ') else word
 			
 			if normalized not in ignore:
@@ -1265,9 +1376,24 @@ class Wordanalyzer:
 		print("%d rows deleted" % (total_count - new_count))
 	#end def
 	
-	#TODO implement
 	def print_commons_marked(self, diff_file):
-		print('print_commons_marked(): not yet implemented!')
+		rows = self._parse_src()
+		marked = Wordanalyzer.get_normalized_words(self._reader.parse(diff_file))
+		
+		self.print_csv_row( # print header
+			['[Original word]', '[Synonyms]', '[Antonyms]', '[Example sentence]', '[Translation]', '[Word type]', '[Level]', '[Tags]']
+		)
+		for row in rows:
+			if Translator.normalize_word(row.original_word) in marked:
+				if len(row.tags) > 0:
+					row.tags = 'marked %s' % row.tags
+				else:
+					row.tags = 'marked'
+				#end if
+			#end if
+			
+			self.print_csv_row(row)
+		#end for
 	#end def
 	
 	def print_without_duplicates(self):
@@ -1306,7 +1432,6 @@ class Wordanalyzer:
 		self.print_csv_row(row)
 	#end def
 	
-	#['[Original word]', '[Normalized word]', '[Synonyms]', '[Antonyms]', '[Example sentence]', '[Translation]', '[New translation]', '[Word type]', '[Level]', '[Tags]']
 	def __print_enhanced_row(self, result, row):
 		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
 		translation = result['translation']
@@ -1318,9 +1443,9 @@ class Wordanalyzer:
 			translation = u'{duplicate} ' + translation
 		#endif
 
-		row.set_normalized_word(normalized)
-		row.set_new_translation(translation)
-		row.set_new_wordtype(wordtype)
+		row.normalized_word = normalized
+		row.new_translation = translation
+		row.new_wordtype    = wordtype
 
 		self.print_csv_row(row)
 	#end def
@@ -1330,9 +1455,9 @@ class Wordanalyzer:
 		ipa         = u'unknown' if result['ipa'] == None else result['ipa']
 		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
 
-		row.set_normalized_word(normalized)
+		row.normalized_word = normalized
 		row.insert(2, ipa)
-		row.set_new_wordtype(wordtype)
+		row.new_wordtype = wordtype
 
 		self.print_csv_row(row)
 	#end def
