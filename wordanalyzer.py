@@ -1265,6 +1265,11 @@ class Wordanalyzer:
 		print("%d rows deleted" % (total_count - new_count))
 	#end def
 	
+	#TODO implement
+	def print_commons_marked(self, diff_file):
+		print('print_commons_marked(): not yet implemented!')
+	#end def
+	
 	def print_without_duplicates(self):
 		total_count = 0
 		new_count   = 0
@@ -1364,6 +1369,7 @@ def main(argv):
 		print('\t--word-array              prints python code with list of words from cvs file [input file]')
 		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist_es.py) (Spanish)')
 		print('\t--diff-csv                prints words from cvs file [diff file] that are not part of csv file [input file]')
+		print('\t--mark-common             prints words from cvs file [input file] and marks those that also exist in [diff file] with a tag')
 		print('\t--remove-dupl             prints words from cvs file [input] without duplicate rows')
 		print
 		print('Column identifiers: [TODO implement]')
@@ -1380,7 +1386,7 @@ def main(argv):
 		print
 		print('\t[[ Standard column identifiers for Spanish: %s ]]' % Wordanalyzer.SPANISH_COLUMN_FORMAT)
 		print('\t[[ Standard column identifiers for English: %s ]]' % Wordanalyzer.ENGLISH_COLUMN_FORMAT)
-		print('\t[[ Standard column identifiers for German: %s ]]' % Wordanalyzer.GERMAN_COLUMN_FORMAT)
+		print('\t[[ Standard column identifiers for German:  %s ]]' % Wordanalyzer.GERMAN_COLUMN_FORMAT)
 		print
 		print('Conjugation modes:')
 		print('\tFORMAS_BASICAS')
@@ -1394,9 +1400,9 @@ def main(argv):
 		print('\tPRESENTE_SUBJUNTIVO')
 		print('\tPRETERITO_IMPERFECTO_SUBJUNTIVO')
 		
-		analyser = SpanishWordAnalyser(u'bloqueó')
-		print(' - '.join(analyser.syllables()))
-		print(analyser.stressed_syllable())
+		#analyser = SpanishWordAnalyser(u'bloqueó')
+		#print(' - '.join(analyser.syllables()))
+		#print(analyser.stressed_syllable())
 		
 		#trans = Wordanalyzer.get_translation_en('ludicrous')
 		#print(trans['normalized'], trans['translation'], trans['wordtype'])
@@ -1459,6 +1465,9 @@ def main(argv):
 		analyzer.print_new_words()
 	elif mode == '--diff-csv':
 		analyzer.print_difference(diff_file)
+	elif mode == '--mark-common': # only works for spanish so far
+		analyzer.set_column_format(Wordanalyzer.SPANISH_COLUMN_FORMAT)
+		analyzer.print_commons_marked(diff_file)
 	elif mode == '--remove-dupl':
 		analyzer.print_without_duplicates()
 	else:
