@@ -13,10 +13,14 @@ import wordlist_es
 
 ### TODO fix verb conjugation bug (yo is always last column)
 
-class CsvRow:
+class CsvRow(object):
 	def __init__(self, values, format_str):
 		self._values = values
 		self._format = format_str.split('|')
+		
+		for n in range(len(self._format) - len(self._values)):
+			self._values.append('') # fill up non-existing columns
+		#end for
 	#end def
 	
 	@property
@@ -117,6 +121,7 @@ class CsvRow:
 	@tags.setter
 	def tags(self, value):
 		self._values[self._format.index('T')] = value
+		print('Debug: set value %s at index %d' % (value, self._format.index('T')))
 	#end def
 	
 	### SPECIAL PROPERTIES ###
@@ -187,7 +192,7 @@ class CsvRow:
 	#end def
 #end def
 
-class CsvReader:
+class CsvReader(object):
 	# @param separator character that separates columns
 	# @param delimiter for text (e.g. " or ')
 	def __init__(self, separator, delimiter, column_format, encoding = 'utf-8'):
@@ -237,7 +242,7 @@ class CsvReader:
 	#end def
 #end class
 
-class Processable:
+class Processable(object):
 	def __init__(self, target, word, row):
 		self.__queue   = Queue()
 		self.__process = Process(target=lambda q, word: q.put(target(word)), args=(self.__queue, word,))
@@ -254,7 +259,7 @@ class Processable:
 	#end def
 #end class
 
-class ThreadPool:
+class ThreadPool(object):
 	POOL_SIZE = 8
 
 	def __init__(self, process):
@@ -282,7 +287,7 @@ class ThreadPool:
 	#end def
 #end class
 
-class Translator:
+class Translator(object):
 	STD_HEADERS = {
 		'User-Agent' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36',
 		'Accept-Language' : 'es-419,es'
@@ -802,7 +807,7 @@ class DictCc(Translator):
 	#end def
 #end class
 
-class SpanishWordAnalyser:
+class SpanishWordAnalyser(object):
 	SPANISH_TO_GERMAN = [ # any occurance of the letter x will not be replaced due to the unpredictability of its pronounciation (h and y need special treatment)
 		(u'ch', u'tsch'), (u'cc', u'ks'), (u'j', u'ch'), (u'ñ', u'nj'), (u'll', u'j'), (u'v', u'b'), (u'z', u's'),
 		(u'ca', u'ka'), (u'cá', u'ká'), (u'co', u'ko'), (u'có', u'kó'), (u'cu', u'ku'), (u'cú', u'kú'),
@@ -961,7 +966,7 @@ class SpanishWordAnalyser:
 	#end def
 #end class
 
-class Wordanalyzer:
+class Wordanalyzer(object):
 	DEFAULT_COLUMN_FORMAT = 'O|M|T'
 	SPANISH_COLUMN_FORMAT = 'O|S|A|E|M|W|L|T'
 	ENGLISH_COLUMN_FORMAT = 'O|P|D|M|W|T'
@@ -1384,15 +1389,24 @@ class Wordanalyzer:
 			['[Original word]', '[Synonyms]', '[Antonyms]', '[Example sentence]', '[Translation]', '[Word type]', '[Level]', '[Tags]']
 		)
 		for row in rows:
-			if Translator.normalize_word(row.original_word) in marked:
+			normalized = Translator.normalize_word(row.original_word)
+			
+			if normalized in marked:
 				if len(row.tags) > 0:
 					row.tags = 'marked %s' % row.tags
 				else:
 					row.tags = 'marked'
 				#end if
+				
+				marked.remove(normalized)
+				print('Debug: tags = %s' % row.tags)
 			#end if
 			
 			self.print_csv_row(row)
+		#end for
+		
+		for word in marked:
+			self.print_csv_row([word, '', '', '', '', '', '', 'new'])
 		#end for
 	#end def
 	
