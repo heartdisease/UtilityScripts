@@ -13,12 +13,81 @@ import wordlist_es
 
 ### TODO fix verb conjugation bug (yo is always last column)
 
+class CsvRow:
+	def __init__(self, values, format_str):
+		self._values = values
+		self._format = format_str.split('|')
+		
+		for i, col in enumerate(self._format):			
+			if i >= len(self._values):
+				break
+			elif col == 'O':
+				self.original_word = self._values[i]
+			elif col == 'P':
+				self.ipa = self._values[i]
+			elif col == 'S':
+				self.synonyms = self._values[i]
+			elif col == 'A':
+				self.antonyms = self._values[i]
+			elif col == 'E':
+				self.example_sentence = self._values[i]
+			elif col == 'D':
+				self.definition = self._values[i]
+			elif col == 'M':
+				self.translation = self._values[i]
+			elif col == 'W':
+				self.word_type = self._values[i]
+			elif col == 'L':
+				self.level = self._values[i]
+			elif col == 'T':
+				self.tags = self._values[i]
+			#end if
+		#end for
+	#end def
+	
+	def set_normalized_word(self, normalized):
+		index = self._format.index('O') + 1
+		
+		if len(self._values) > index:
+			self._format.insert(index, 'N') # N = normalized
+			self._values.insert(index, normalized)
+		#end if
+	#end def
+	
+	def set_new_translation(self, translation):
+		index = self._format.index('M') + 1
+		
+		if len(self._values) > index:
+			self._format.insert(index, 'NM') # NM = new meaning/translation
+			self._values.insert(index, translation)
+		#end if
+	#end def
+	
+	def set_new_wordtype(self, wordtype):
+		index = self._format.index('W') + 1
+		
+		if len(self._values) > index:
+			self._format.insert(index, 'NW') # NW = new word type
+			self._values.insert(index, wordtype)
+		#end if
+	#end def
+	
+	def __len__(self):
+		return len(self._values)
+	#end def
+	
+	def __getitem__(self, index):
+		return self._values[index]
+	#end def
+#end def
+
 class CsvReader:
 	# @param separator character that separates columns
 	# @param delimiter for text (e.g. " or ')
-	def __init__(self, separator, delimiter, encoding = 'utf-8'):
+	def __init__(self, separator, delimiter, column_format, encoding = 'utf-8'):
 		self._separator = separator
 		self._delimiter = delimiter
+		self._column_format = column_format
 		self._encoding = encoding
 	#end def
 	
@@ -32,7 +101,7 @@ class CsvReader:
 			quoted = False
 			escaped = False
 			
-			for c in text:
+			for c in text: # TODO create row objects with column names!
 				if escaped: # add any character to column text if escaped
 					col += c
 					escaped = False
@@ -49,7 +118,7 @@ class CsvReader:
 					#end if
 				elif c == '\n' and not quoted: # detected end of row
 					row.append(col)
-					rows.append(row)
+					rows.append(CsvRow(row, self._column_format))
 					row = []
 					col = ''
 				else: # normal character
@@ -720,20 +789,41 @@ class SpanishWordAnalyser:
 				syllable += c
 			else:
 				if SpanishWordAnalyser.is_vowel(c):
-					if c == u'i' or c == u'u':
+					if SpanishWordAnalyser.has_accent(c):
+						self._stressed = len(self._syllables)
+					#end if
+				
+					if not SpanishWordAnalyser.is_vowel(syllable[-1]) or c == u'i' or c == u'u':
 						syllable += c
 					else:
-						self._syllables.push(syllable)
-						syllable = c
+						if syllable[-1] == u'u' or syllable[-2] == u'q':
+							syllable += c
+						else:
+							self._syllables.append(syllable)
+							syllable = c
+						#end if
 					#end if
 				else: # character is a consonant
-					syllable += c # highly inaccurate!
-					# TODO!
+					if SpanishWordAnalyser.is_vowel(syllable[-1]):
+						self._syllables.append(syllable)
+						syllable = c
+					else:
+						syllable += c
+					#end if
 				#end if
 			#end if
 		#end for
 		
-		self._syllables.push(syllable)
+		self._syllables.append(syllable)
+		if self._stressed == -1: # detect accent for words without one
+			if SpanishWordAnalyser.contains_accent(syllable):
+				self._stressed = len(self._syllables) - 1
+			elif len(self._syllables) > 1 and (syllable == u'n' or syllable == u's' or SpanishWordAnalyser.is_vowel(syllable)):
+				self._stressed = len(self._syllables) - 2 # accent on penultimate syllable
+			else:
+				self._stressed = len(self._syllables) - 1 # accent on last syllable
+			#end if
+		#end if
 	#end def
 	
 	@staticmethod
@@ -766,10 +856,13 @@ class SpanishWordAnalyser:
 #end class
 
 class Wordanalyzer:
+	DEFAULT_COLUMN_FORMAT = 'O|M|T'
+	SPANISH_COLUMN_FORMAT = 'O|S|A|E|M|W|L|T'
+	ENGLISH_COLUMN_FORMAT = 'O|P|D|M|W|T'
+	GERMAN_COLUMN_FORMAT  = 'O|M|W|T'
 	CSV_SEPARATOR = ','
 	TEXT_DELIMITER = '"'
 	WORD_SPLIT_REGEX = ur'[ \t-\.,:;!\?\(\)"\'“”]'
-	READER = CsvReader(CSV_SEPARATOR, TEXT_DELIMITER)
 	DICT_CC_MODULE = None
 	SPANISH_TO_GERMAN = [ # any occurance of the letter x will not be replaced due to the unpredictability of its pronounciation (h and y need special treatment)
 		(u'ch', u'tsch'), (u'cc', u'ks'), (u'j', u'ch'), (u'ñ', u'nj'), (u'll', u'j'), (u'v', u'b'), (u'z', u's'),
@@ -898,12 +991,22 @@ class Wordanalyzer:
 	def __init__(self, src, out = None):
 		self._src = src
 		self._ostream = sys.stdout if out == None else codecs.open(out, 'w', 'utf-8')
+		self.set_column_format(Wordanalyzer.DEFAULT_COLUMN_FORMAT)
 	#end def
 	
 	def close(self):
 		if self._ostream != sys.stdout:
 			self._ostream.close()
 		#end if
+	#end def
+	
+	def set_column_format(self, column_format):
+		self._column_format = column_format
+		self._reader = CsvReader(Wordanalyzer.CSV_SEPARATOR, Wordanalyzer.TEXT_DELIMITER, column_format)
+	#end def
+	
+	def _parse_src(self):
+		return self._reader.parse(self._src)
 	#end def
 	
 	def print_csv_row(self, cols):
@@ -964,7 +1067,7 @@ class Wordanalyzer:
 			#end for
 		#end with
 	#end def
-
+	
 	##
 	# Parses CSV table already containing at least two columns with Spanish/English word pairs. The third column is optional and usually contains a 'checked' flag, which
 	# declares whether a word has been already validated. The generated table will contain an extra row for a normalized version of the original Spanish word, an extra row
@@ -975,14 +1078,16 @@ class Wordanalyzer:
 	##
 	def print_enhanced_table(self):
 		thread_pool = ThreadPool(self.__print_enhanced_row)
-		rows = Wordanalyzer.READER.parse(self._src)
-
-		self.print_csv_row(['[Original word]', '[Normalized form]', '[New translation]', '[Translation]', '[Word type]', '[Checked]']) # print header
+		rows = self._parse_src()
+		
+		self.print_csv_row( # print header
+			['[Original word]', '[Normalized word]', '[Synonyms]', '[Antonyms]', '[Example sentence]', '[Translation]', '[New translation]', '[Word type]', '[Level]', '[Tags]']
+		)
 		for row in rows:
 			if len(row) < 2:
 				print('Skip incomplete row')
 			else:
-				p = Processable(lambda word: Wordanalyzer.get_translation_es(word), row[0], row)
+				p = Processable(lambda word: Wordanalyzer.get_translation_es(word), row.original_word, row)
 				p.start()
 				
 				thread_pool.add(p)
@@ -994,7 +1099,7 @@ class Wordanalyzer:
 	
 	def print_enhanced_table_en(self):
 		thread_pool = ThreadPool(self.__print_enhanced_row)
-		rows = Wordanalyzer.READER.parse(self._src)
+		rows = self._parse_src()
 
 		self.print_csv_row(['[Original word]', '[Normalized form]', '[New translation]', '[Translation]', '[Word type]', '[Checked]']) # print header
 		for row in rows:
@@ -1013,7 +1118,7 @@ class Wordanalyzer:
 	
 	def print_enhanced_table_de(self):
 		thread_pool = ThreadPool(self.__print_enhanced_row_de)
-		rows = Wordanalyzer.READER.parse(self._src)
+		rows = self._parse_src()
 
 		self.print_csv_row(['[Original word]', '[IPA]', '[Word type]']) # print header
 		for row in rows:
@@ -1032,7 +1137,7 @@ class Wordanalyzer:
 	
 	def print_table_with_ipa_en(self):
 		thread_pool = ThreadPool(self.__print_row_with_ipa)
-		rows = Wordanalyzer.READER.parse(self._src)
+		rows = self._parse_src()
 
 		self.print_csv_row(['[Original word]', '[IPA]', '[Word type]']) # print header
 		for row in rows:
@@ -1051,7 +1156,7 @@ class Wordanalyzer:
 	
 	def print_table_with_ipa_de(self):
 		thread_pool = ThreadPool(self.__print_row_with_ipa)
-		rows = Wordanalyzer.READER.parse(self._src)
+		rows = self._parse_src()
 
 		self.print_csv_row(['[Original word]', '[IPA]', '[Word type]']) # print header
 		for row in rows:
@@ -1069,7 +1174,7 @@ class Wordanalyzer:
 	#end def
 	
 	def print_table_with_phonetics_es(self):
-		rows = Wordanalyzer.READER.parse(self._src) # TODO implement sillable separator class
+		rows = self._parse_src() # TODO implement sillable separator class
 		
 		self.print_csv_row(['[Original word]', '[Pronounciation]', '[Translation]', '[Word type]']) # print header
 		for row in rows:
@@ -1085,7 +1190,7 @@ class Wordanalyzer:
 	
 	def print_conjugation_table(self, tenses):
 		thread_pool = ThreadPool(self.__print_conjugation_table)
-		rows = Wordanalyzer.READER.parse(self._src)
+		rows = self._parse_src()
 		
 		self.print_csv_row([u'[Infinitive]', u'[yo]', u'[tú]', u'[el/ella/usted]', u'[nosotros, -as]', u'[vosotros, -as]', u'[ellos/ellas/ustedes]', u'[Tense]']) # print header
 		for row in rows:
@@ -1105,7 +1210,7 @@ class Wordanalyzer:
 	#end def
 	
 	def print_word_array(self):
-		rows = Wordanalyzer.READER.parse(self._src)
+		rows = self._parse_src()
 
 		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION = set(sorted([\n') # print header
 		first_row = True
@@ -1126,7 +1231,7 @@ class Wordanalyzer:
 	#end def
 	
 	def print_new_words(self):
-		for row in Wordanalyzer.READER.parse(self._src):
+		for row in self._parse_src():
 			words = set([Translator.normalize_word(word) for word in Translator.resolve_word_list(row[0])])
 			
 			if words <= wordlist_es.WORD_COLLECTION_ES: # words is subset from WORD_COLLECTION
@@ -1141,9 +1246,9 @@ class Wordanalyzer:
 	def print_difference(self, newfile):
 		total_count = 0
 		new_count   = 0
-		ignore = [(row[0][3:] if row[0].startswith('to ') else row[0]).strip().lower() for row in Wordanalyzer.READER.parse(self._src)]
+		ignore = [(row[0][3:] if row[0].startswith('to ') else row[0]).strip().lower() for row in self._parse_src()]
 		
-		for row in Wordanalyzer.READER.parse(newfile):
+		for row in self._reader.parse(newfile):
 			word = row[0].strip().lower()
 			normalized = word[3:] if word.startswith('to ') else word
 			
@@ -1163,7 +1268,7 @@ class Wordanalyzer:
 	def print_without_duplicates(self):
 		total_count = 0
 		new_count   = 0
-		rows = Wordanalyzer.READER.parse(self._src)
+		rows = self._parse_src()
 		checked_words = []
 		
 		for row in rows:
@@ -1196,6 +1301,7 @@ class Wordanalyzer:
 		self.print_csv_row(row)
 	#end def
 	
+	#['[Original word]', '[Normalized word]', '[Synonyms]', '[Antonyms]', '[Example sentence]', '[Translation]', '[New translation]', '[Word type]', '[Level]', '[Tags]']
 	def __print_enhanced_row(self, result, row):
 		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
 		translation = result['translation']
@@ -1203,13 +1309,13 @@ class Wordanalyzer:
 		
 		if translation == None:
 			translation = u'{unknown}'
-		elif len(translation) > 0 and translation in row[1]:
+		elif len(translation) > 0 and translation in row.translation:
 			translation = u'{duplicate} ' + translation
 		#endif
 
-		row.insert(1, normalized)
-		row.insert(2, translation)
-		row.insert(4, wordtype)
+		row.set_normalized_word(normalized)
+		row.set_new_translation(translation)
+		row.set_new_wordtype(wordtype)
 
 		self.print_csv_row(row)
 	#end def
@@ -1219,9 +1325,9 @@ class Wordanalyzer:
 		ipa         = u'unknown' if result['ipa'] == None else result['ipa']
 		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
 
-		row.insert(1, normalized)
+		row.set_normalized_word(normalized)
 		row.insert(2, ipa)
-		row.insert(4, wordtype)
+		row.set_new_wordtype(wordtype)
 
 		self.print_csv_row(row)
 	#end def
@@ -1260,6 +1366,22 @@ def main(argv):
 		print('\t--diff-csv                prints words from cvs file [diff file] that are not part of csv file [input file]')
 		print('\t--remove-dupl             prints words from cvs file [input] without duplicate rows')
 		print
+		print('Column identifiers: [TODO implement]')
+		print('\tO - original language (e.g. Spanish)')
+		print('\tP - phonetic transcription in IPA')
+		print('\tS - synonyms')
+		print('\tA - antonyms')
+		print('\tE - example sentence')
+		print('\tD - definition (alternative to plain translation)')
+		print('\tM - meaning/translation (e.g. English)')
+		print('\tW - word type (e.g. verb, noun, etc.)')
+		print('\tL - Level of relevance (0, 1, ... Smaller number = higher relevance)')
+		print('\tT - Tags (Anki)')
+		print
+		print('\t[[ Standard column identifiers for Spanish: %s ]]' % Wordanalyzer.SPANISH_COLUMN_FORMAT)
+		print('\t[[ Standard column identifiers for English: %s ]]' % Wordanalyzer.ENGLISH_COLUMN_FORMAT)
+		print('\t[[ Standard column identifiers for German: %s ]]' % Wordanalyzer.GERMAN_COLUMN_FORMAT)
+		print
 		print('Conjugation modes:')
 		print('\tFORMAS_BASICAS')
 		print('\tIMPERATIVO')
@@ -1271,6 +1393,10 @@ def main(argv):
 		print('\tCONDICIONAL_SIMPLE')
 		print('\tPRESENTE_SUBJUNTIVO')
 		print('\tPRETERITO_IMPERFECTO_SUBJUNTIVO')
+		
+		analyser = SpanishWordAnalyser(u'bloqueó')
+		print(' - '.join(analyser.syllables()))
+		print(analyser.stressed_syllable())
 		
 		#trans = Wordanalyzer.get_translation_en('ludicrous')
 		#print(trans['normalized'], trans['translation'], trans['wordtype'])
@@ -1296,26 +1422,36 @@ def main(argv):
 	analyzer = Wordanalyzer(input_file) if output_file == '-' else Wordanalyzer(input_file, output_file)
 	
 	if mode == '--wordlist-es':
+		analyzer.set_column_format(Wordanalyzer.SPANISH_COLUMN_FORMAT)
 		analyzer.print_word_list('es')
 	elif mode == '--wordlist-en':
+		analyzer.set_column_format(Wordanalyzer.ENGLISH_COLUMN_FORMAT)
 		analyzer.print_word_list('en')
 	elif mode == '--wordlist-de':
+		analyzer.set_column_format(Wordanalyzer.GERMAN_COLUMN_FORMAT)
 		analyzer.print_word_list('de')
 	elif mode == '--check-csv-es':
+		analyzer.set_column_format(Wordanalyzer.SPANISH_COLUMN_FORMAT)
 		analyzer.print_enhanced_table()
 	elif mode == '--check-csv-en':
+		analyzer.set_column_format(Wordanalyzer.ENGLISH_COLUMN_FORMAT)
 		analyzer.print_enhanced_table_en()
 	elif mode == '--check-csv-de':
+		analyzer.set_column_format(Wordanalyzer.GERMAN_COLUMN_FORMAT)
 		analyzer.print_enhanced_table_de()
 	elif mode == '--add-ipa-en':
 		analyzer.print_table_with_ipa_en()
 	elif mode == '--add-ipa-de':
+		analyzer.set_column_format(Wordanalyzer.GERMAN_COLUMN_FORMAT)
 		analyzer.print_table_with_ipa_de()
 	elif mode == '--add-phonetic-es':
+		analyzer.set_column_format(Wordanalyzer.SPANISH_COLUMN_FORMAT)
 		analyzer.print_table_with_phonetics_es()
 	elif mode.startswith('--conjugate-verbs='):
 		identifier = mode[18:] # 18 = length of mode string
 		tense = getattr(DixOsolaComConjugator, identifier) # retrieve constant with reflection
+		
+		analyzer.set_column_format(Wordanalyzer.SPANISH_COLUMN_FORMAT)
 		analyzer.print_conjugation_table([tense])
 	elif mode == '--word-array':
 		analyzer.print_word_array()
