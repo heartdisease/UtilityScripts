@@ -408,12 +408,28 @@ class SpanishdictCom(Translator):
 		
 		p = self._pquery(word)
 		if p != None:
-			result_block = p('div.translate.card')
+			result_block = p('.main-container .translate .card')
 			normalized   = result_block.find('div.quickdef > div.source > h1').text()
 			translation  = result_block.find('div.quickdef > div.lang > div.el').text()
 			partofspeach = result_block.find('span.part_of_speech:first').text()
-			wordtype     = partofspeach if partofspeach == None or not u' ' in partofspeach else partofspeach.split(u' ')[-1]
+			wordtype     = None
 			head_word    = result_block.find('div.dictionary_word > span.head_word').text()
+			
+			if partofspeach == None or not u' ' in partofspeach:
+				wordtype = partofspeach
+			else:				
+				if u'sustantivo' in partofspeach:
+					wordtype = u'sustantivo'
+				elif u'verbo' in partofspeach:
+					wordtype = u'verbo'
+				elif u'adverbio' in partofspeach:
+					wordtype = u'adverbio'
+				elif u'adjetivo' in partofspeach:
+					wordtype = u'adjetivo'
+				else:
+					wordtype = partofspeach.split(u' ')[0]
+				#end if
+			#end if
 			
 			if partofspeach != None:
 				partofspeach = partofspeach.strip() # remove trailing white spaces
@@ -427,12 +443,12 @@ class SpanishdictCom(Translator):
 			#end if
 			#normalized = SpanishdictCom.remove_duplicates(normalized)
 			
-			if wordtype == u'noun':
+			if wordtype == u'sustantivo' or wordtype == u'noun':
 				if partofspeach == None: # special case where gender declaration is missing
 					normalized = u'?? ' + normalized
 				else:
-					is_masculine = u'masculine' in partofspeach
-					is_feminine  = u'feminine' in partofspeach
+					is_masculine = u'masculine' in partofspeach or u'masculino' in partofspeach
+					is_feminine  = u'feminine' in partofspeach or u'femenino' in partofspeach
 				
 					if is_masculine and is_feminine:
 						normalized = u'el/la ' + normalized
@@ -458,17 +474,17 @@ class SpanishdictCom(Translator):
 			print(u'Invalid response for "' + word + '".')
 		#end if
 		
-		# translate english word type to spanish
-		if wordtype == u'noun':
-			wordtype = u'sustantivo'
-		elif wordtype == u'verb':
-			wordtype = u'verbo'
-		elif wordtype == u'adjective':
-			wordtype = u'adjetivo'
-		elif wordtype == u'adverb':
-			wordtype = u'adverbio'
-		elif wordtype == u'pronoun':
-			wordtype = u'pronombre'
+		# translate english word type to spanish (outdated)
+		#if wordtype == u'noun':
+		#	wordtype = u'sustantivo'
+		#elif wordtype == u'verb':
+		#	wordtype = u'verbo'
+		#elif wordtype == u'adjective':
+		#	wordtype = u'adjetivo'
+		#elif wordtype == u'adverb':
+		#	wordtype = u'adverbio'
+		#elif wordtype == u'pronoun':
+		#	wordtype = u'pronombre'
 		#endif
 	
 		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
@@ -1197,7 +1213,7 @@ class Wordanalyzer(object):
 		rows = self._parse_src()
 		
 		self.print_csv_row( # print header
-			['[Original word]', '[Normalized word]', '[Synonyms]', '[Antonyms]', '[Example sentence]', '[Translation]', '[New translation]', '[Word type]', '[Level]', '[Tags]']
+			['[Original word]', '[Normalized word]', '[Synonyms]', '[Antonyms]', '[Example sentence]', '[Translation]', '[New translation]', '[Word type]', '[New word type]', '[Level]', '[Tags]']
 		)
 		for row in rows:
 			if len(row) < 2:
