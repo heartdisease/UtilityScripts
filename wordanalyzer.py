@@ -202,6 +202,8 @@ class CsvReader(object):
 		self._encoding = encoding
 	#end def
 	
+	# Parses CSV table according to the column format rules.
+	# Whitespcases at the beginning or end of columns are automatically removed.
 	def parse(self, csvfile):
 		rows = []
 		
@@ -224,11 +226,11 @@ class CsvReader(object):
 					if quoted: # within quotes column separators belong to column text
 						col += c
 					else: # found end of column
-						row.append(col)
+						row.append(col.strip())
 						col = ''
 					#end if
 				elif c == '\n' and not quoted: # detected end of row
-					row.append(col)
+					row.append(col.strip())
 					rows.append(CsvRow(row, self._column_format))
 					row = []
 					col = ''
@@ -1230,15 +1232,15 @@ class Wordanalyzer(object):
 	#end def
 	
 	def print_enhanced_table_en(self):
-		thread_pool = ThreadPool(self.__print_enhanced_row)
+		thread_pool = ThreadPool(self.__print_enhanced_row_en)
 		rows = self._parse_src()
-
-		self.print_csv_row(['[Original word]', '[Normalized form]', '[New translation]', '[Translation]', '[Word type]', '[Checked]']) # print header
+		
+		self.print_csv_row(['[Original word]', '[Normalized word]', '[IPA]', '[Definition]', '[Translation]', '[New translation]', '[Word type]', '[New word type]', '[Tags]']) # print header
 		for row in rows:
 			if len(row) < 2:
 				print('Skip incomplete row')
 			else:
-				p = Processable(lambda word: Wordanalyzer.get_translation_en(word), row[0], row)
+				p = Processable(lambda word: Wordanalyzer.get_translation_en(word), row.original_word, row)
 				p.start()
 				
 				thread_pool.add(p)
@@ -1463,6 +1465,24 @@ class Wordanalyzer(object):
 	#end def
 	
 	def __print_enhanced_row(self, result, row):
+		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
+		translation = result['translation']
+		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
+		
+		if translation == None:
+			translation = u'{unknown}'
+		elif len(translation) > 0 and translation in row.translation:
+			translation = u'{duplicate} ' + translation
+		#endif
+
+		row.normalized_word = normalized
+		row.new_translation = translation
+		row.new_wordtype    = wordtype
+
+		self.print_csv_row(row)
+	#end def
+	
+	def __print_enhanced_row_en(self, result, row):
 		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
 		translation = result['translation']
 		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
