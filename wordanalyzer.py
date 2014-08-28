@@ -1501,19 +1501,21 @@ class Wordanalyzer(object):
 	#end def
 	
 	def __print_enhanced_row_de(self, result, row):
-		normalized  = u'unknown' if result['normalized'] == None else result['normalized']
-		ipa         = u'unknown' if result['ipa'] == None else result['ipa']
+		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
+		ipa         = u'{unknown}' if result['ipa'] == None else result['ipa']
 		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
 
 		row.normalized_word = normalized
-		row.insert(2, ipa)
-		row.new_wordtype = wordtype
+		row.ipa             = ipa
+		row.new_wordtype    = wordtype
 
 		self.print_csv_row(row)
 	#end def
 	
 	def __print_row_with_ipa(self, result, row):
-		row.insert(1, result if result != None else '') # result = IPA or None
+		if result != None:
+			row.ipa = result
+		#end if
 		self.print_csv_row(row)
 	#end def
 	
@@ -1621,6 +1623,7 @@ def main(argv):
 		analyzer.set_column_format(Wordanalyzer.GERMAN_COLUMN_FORMAT)
 		analyzer.print_enhanced_table_de()
 	elif mode == '--add-ipa-en':
+		analyzer.set_column_format(Wordanalyzer.ENGLISH_COLUMN_FORMAT)
 		analyzer.print_table_with_ipa_en()
 	elif mode == '--add-ipa-de':
 		analyzer.set_column_format(Wordanalyzer.GERMAN_COLUMN_FORMAT)
