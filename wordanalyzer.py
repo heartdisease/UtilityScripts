@@ -10,6 +10,7 @@ import urllib2
 import codecs
 
 import wordlist_es
+import wordlist_en
 
 ### TODO fix verb conjugation bug (yo is always last column)
 
@@ -315,7 +316,7 @@ class Translator(object):
 	@staticmethod
 	def resolve_word_list(string):
 		words = []
-		sections = Translator.ANNOTATION_PATTERN.sub('', string).split(';')
+		sections = Translator.strip_annotations(string).split(';')
 		
 		for section in sections:
 			for group in Translator.WORD_PATTERN.findall(section):
@@ -335,6 +336,11 @@ class Translator(object):
 		#end for
 		
 		return set(words)
+	#end def
+	
+	@staticmethod
+	def strip_annotations(string):
+		return Translator.ANNOTATION_PATTERN.sub('', string)
 	#end def
 	
 	def __init__(self, url_template, encoding = 'utf-8', headers = STD_HEADERS):
@@ -1343,33 +1349,46 @@ class Wordanalyzer(object):
 		thread_pool.finish()
 	#end def
 	
-	def print_word_array(self):
+	def print_word_array(self, lang_code):
 		rows = self._parse_src()
 
-		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION = set(sorted([\n') # print header
+		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION_%s = set(sorted([\n' % lang_code) # print header
 		first_row = True
 		for row in rows:
-			for word in Translator.resolve_word_list(row.original_word):
-				if first_row:
-					self._ostream.write('\t  u\'')
-					first_row = False
-				else:
-					self._ostream.write('\t, u\'')
-				#end if
-				
-				self._ostream.write(word.lower())
-				self._ostream.write('\'\n')
-			#end for
+			# not needed with new format: for word in Translator.resolve_word_list(row.original_word)
+			word = Translator.strip_annotations(row.original_word).lower() # normalize entry
+			
+			if first_row:
+				self._ostream.write('\t  u\'')
+				first_row = False
+			else:
+				self._ostream.write('\t, u\'')
+			#end if
+			
+			self._ostream.write(word.replace('\'', '\\\''))
+			self._ostream.write('\'\n')
 		#end for
 		self._ostream.write(']))\n')
 	#end def
 	
-	def print_new_words(self):
+	def print_new_words_es(self):
 		for row in self._parse_src():
 			words = set([Translator.normalize_word(word) for word in Translator.resolve_word_list(row.original_word)])
 			
 			if words <= wordlist_es.WORD_COLLECTION_ES: # words is subset from WORD_COLLECTION
 				print('Removed entry %s (Normalized: %s)' % (row.original_word, ', '.join(words)))
+			else:
+				self.print_csv_row(row)
+			#end if
+		#end if
+	#end def
+	
+	def print_new_words_en(self):
+		for row in self._parse_src():
+			word = Translator.strip_annotations(row.original_word).lower() # normalize entry
+			
+			if word in wordlist_en.WORD_COLLECTION_EN: # words is subset from WORD_COLLECTION
+				print('Removed entry %s (Normalized: %s)' % (row.original_word, word))
 			else:
 				self.print_csv_row(row)
 			#end if
@@ -1543,8 +1562,10 @@ def main(argv):
 		print('\t--add-ipa-de              prints enhanced version of cvs file [input file] including IPA annotations (German)')
 		print('\t--add-phonetic-es         prints enhanced version of cvs file [input file] including annotations for pronounciation in German (Spanish)')
 		print('\t--conjugate-verbs=[TENSE] prints table with conjugated verbs from cvs file [input file] (Spanish)')
-		print('\t--word-array              prints python code with list of words from cvs file [input file]')
-		print('\t--check-new               prints words from cvs file [input file] that are not yet part of the vocublary collection (see wordlist_es.py) (Spanish)')
+		print('\t--word-array-es           prints python code with list of words from cvs file [input file] (Spanish)')
+		print('\t--word-array-en           prints python code with list of words from cvs file [input file] (English)')
+		print('\t--check-new-es            prints words from cvs file [input file] that are not yet part of the vocabulary collection (see wordlist_es.py) (Spanish)')
+		print('\t--check-new-en            prints words from cvs file [input file] that are not yet part of the vocabulary collection (see wordlist_en.py) (English)')
 		print('\t--diff-csv                prints words from cvs file [diff file] that are not part of csv file [input file]')
 		print('\t--mark-common             prints words from cvs file [input file] and marks those that also exist in [diff file] with a tag')
 		print('\t--remove-dupl             prints words from cvs file [input] without duplicate rows')
@@ -1637,10 +1658,14 @@ def main(argv):
 		
 		analyzer.set_column_format(Wordanalyzer.SPANISH_COLUMN_FORMAT)
 		analyzer.print_conjugation_table([tense])
-	elif mode == '--word-array':
-		analyzer.print_word_array()
-	elif mode == '--check-new':
-		analyzer.print_new_words()
+	elif mode == '--word-array-es':
+		analyzer.print_word_array('ES')
+	elif mode == '--word-array-en':
+		analyzer.print_word_array('EN')
+	elif mode == '--check-new-es':
+		analyzer.print_new_words_es()
+	elif mode == '--check-new-en':
+		analyzer.print_new_words_en()
 	elif mode == '--diff-csv':
 		analyzer.print_difference(diff_file)
 	elif mode == '--mark-common': # only works for spanish so far
