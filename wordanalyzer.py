@@ -1358,20 +1358,38 @@ class Wordanalyzer(object):
 
 		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION_%s = set(sorted([\n' % lang_code) # print header
 		first_row = True
-		for row in rows:
-			# not needed with new format: for word in Translator.resolve_word_list(row.original_word)
-			word = Translator.strip_annotations(row.original_word).lower() # normalize entry
+		if lang_code == 'ES':
+			for row in rows:
+				for word in Translator.resolve_word_list(row.original_word):
+					word = Translator.strip_annotations(word).lower() # normalize entry
 			
-			if first_row:
-				self._ostream.write('\t  u\'')
-				first_row = False
-			else:
-				self._ostream.write('\t, u\'')
-			#end if
+					if first_row:
+						self._ostream.write('\t  u\'')
+						first_row = False
+					else:
+						self._ostream.write('\t, u\'')
+					#end if
+					
+					self._ostream.write(word.replace('\'', '\\\''))
+					self._ostream.write('\'\n')
+				#end for
+			#end for
+		else:
+			for row in rows:
+				word = Translator.strip_annotations(row.original_word).lower() # normalize entry
 			
-			self._ostream.write(word.replace('\'', '\\\''))
-			self._ostream.write('\'\n')
-		#end for
+				if first_row:
+					self._ostream.write('\t  u\'')
+					first_row = False
+				else:
+					self._ostream.write('\t, u\'')
+				#end if
+			
+				self._ostream.write(word.replace('\'', '\\\''))
+				self._ostream.write('\'\n')
+			#end for
+		#end if
+		
 		self._ostream.write(']))\n')
 	#end def
 	
