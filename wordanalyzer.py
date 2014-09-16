@@ -184,6 +184,10 @@ class CsvRow(object):
 		#end if
 	#end def
 	
+	def extend(self, array):
+		self._values.extend(array)
+	#end def
+	
 	def __len__(self):
 		return len(self._values)
 	#end def
@@ -465,7 +469,7 @@ class SpanishdictCom(Translator):
 					elif is_feminine:
 						# use article 'el' if noun starts with a-sound (still buggy!)
 						if normalized.startswith(u'a') or normalized.startswith(u'ha'):
-							normalized = u'el ' + normalized + ' {f}'
+							normalized = u'el ' + normalized + ' [fem.]'
 						else:
 							normalized = u'la ' + normalized
 						#end if
@@ -482,17 +486,17 @@ class SpanishdictCom(Translator):
 			print(u'Invalid response for "' + word + '".')
 		#end if
 		
-		# translate english word type to spanish (outdated)
-		#if wordtype == u'noun':
-		#	wordtype = u'sustantivo'
-		#elif wordtype == u'verb':
-		#	wordtype = u'verbo'
-		#elif wordtype == u'adjective':
-		#	wordtype = u'adjetivo'
-		#elif wordtype == u'adverb':
-		#	wordtype = u'adverbio'
-		#elif wordtype == u'pronoun':
-		#	wordtype = u'pronombre'
+		# translate english word type to spanish due to site inconsistencies
+		if wordtype == u'noun':
+			wordtype = u'sustantivo'
+		elif wordtype == u'verb':
+			wordtype = u'verbo'
+		elif wordtype == u'adjective':
+			wordtype = u'adjetivo'
+		elif wordtype == u'adverb':
+			wordtype = u'adverbio'
+		elif wordtype == u'pronoun':
+			wordtype = u'pronombre'
 		#endif
 	
 		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
