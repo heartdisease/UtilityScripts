@@ -997,7 +997,7 @@ class SpanishWordAnalyser(object):
 class Wordanalyzer(object):
 	DEFAULT_COLUMN_FORMAT = 'O|M|T'
 	SPANISH_COLUMN_FORMAT = 'O|S|A|E|M|W|L|T'
-	ENGLISH_COLUMN_FORMAT = 'O|P|D|M|W|T'
+	ENGLISH_COLUMN_FORMAT = 'O|P|E|M|W|T'
 	GERMAN_COLUMN_FORMAT  = 'O|M|W|T'
 	CSV_SEPARATOR = ','
 	TEXT_DELIMITER = '"'
@@ -1421,11 +1421,11 @@ class Wordanalyzer(object):
 	def print_difference(self, newfile):
 		total_count = 0
 		new_count   = 0
-		ignore = [(row.original_word[3:] if row.original_word.startswith('to ') else row.original_word).strip().lower() for row in self._parse_src()]
+		ignore = [row.original_word.strip().lower() for row in self._parse_src()] # [(row.original_word[3:] if row.original_word.startswith('to ') else row.original_word).strip().lower() for row in self._parse_src()]
 		
 		for row in self._reader.parse(newfile):
 			word = row.original_word.strip().lower()
-			normalized = word[3:] if word.startswith('to ') else word
+			normalized = word # word[3:] if word.startswith('to ') else word
 			
 			if normalized not in ignore:
 				self.print_csv_row(row)
@@ -1477,7 +1477,7 @@ class Wordanalyzer(object):
 		
 		for row in rows:
 			word = row[0].strip()
-			normalized = word[3:].lower() if word.startswith('to ') else word.lower()
+			normalized = word.lower() # word[3:].lower() if word.startswith('to ') else word.lower()
 			
 			if normalized not in checked_words:
 				checked_words.append(normalized)
