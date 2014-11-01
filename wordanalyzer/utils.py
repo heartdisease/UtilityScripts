@@ -14,6 +14,12 @@ class CsvRow(object):
 		#end for
 	#end def
 	
+	def get_column_format(self):
+		return self._format
+	#end def
+	
+	## PROPERTIES ##
+	
 	@property
 	def original_word(self):
 		return self._values[self._format.index('O')]
@@ -173,6 +179,27 @@ class CsvRow(object):
 			#end if
 		#end if
 	#end def
+	
+	@property
+	def new_ipa(self):
+		return self._values[self._format.index('NP')]
+	#end def
+	
+	@new_ipa.setter
+	def new_ipa(self, translation):
+		if 'NP' in self._format:
+			self._values[self._format.index('NP')] = translation
+		else:
+			index = self._format.index('P') + 1
+		
+			if len(self._values) > index:
+				self._format.insert(index, 'NP') # NP = new IPA
+				self._values.insert(index, translation)
+			#end if
+		#end if
+	#end def
+	
+	## COLLECTION INTERFACE ##
 	
 	def extend(self, array):
 		self._values.extend(array)
