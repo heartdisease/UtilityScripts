@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 import re
 import sys
+import codecs
 
-import utils
-import translators
+from utils import CsvReader, ThreadPool, Processable
+from translators import SpanishdictCom, DixOsolaComDe, DixOsolaComEn, SpanishDictConjugator, DixOsolaComConjugator, DeWiktionaryOrg, EnWiktionaryOrg, OxfordDictionary, DictCc
 import wordlist_es
 import wordlist_en
 
@@ -171,7 +172,7 @@ class SpanishWordAnalyzer(object):
 #end class
 
 class Wordanalyzer(object):
-
+	"""Main class."""
 	DEFAULT_COLUMN_FORMAT = 'O|M|T'
 	SPANISH_COLUMN_FORMAT = 'O|S|A|E|M|W|L|T'
 	ENGLISH_COLUMN_FORMAT = 'O|P|E|M|W|T'
@@ -322,15 +323,26 @@ class Wordanalyzer(object):
 	#end def
 	
 	def set_column_format(self, column_format):
+		"""TODO decribe what this method does.
+	
+		Keyword arguments:
+		column_format -- TODO describe what this argument is about
+		"""		
 		self._column_format = column_format
 		self._reader = CsvReader(Wordanalyzer.CSV_SEPARATOR, Wordanalyzer.TEXT_DELIMITER, column_format)
 	#end def
 	
 	def _parse_src(self):
+		"""TODO decribe what this method does."""
 		return self._reader.parse(self._src)
 	#end def
 	
 	def print_csv_row(self, cols):
+		"""TODO decribe what this method does.
+	
+		Keyword arguments:
+		cols -- TODO describe what this argument is about
+		"""	
 		first_col = True
 	
 		for col in cols:
@@ -347,14 +359,45 @@ class Wordanalyzer(object):
 	
 		self._ostream.write('\n')
 	#end def
+	
+	def print_header_row(self, column_format):
+		"""TODO decribe what this method does.
+		
+		Keyword arguments:
+		column_format -- column format as array which is used for the current table
+		"""
+		header_columns = []
+		
+		for col in column_format:
+			header_columns.append('[' + {
+				'O': 'Original word',
+				'P': 'IPA',
+				'S': 'Synonyms',
+				'A': 'Antonyms',
+				'E': 'Example sentence',
+				'D': 'Definition',
+				'M': 'Translation',
+				'W': 'Word type',
+				'L': 'Level',
+				'T': 'Tags',
+				# special column identifiers
+				'N': 'Normalized word',
+				'NM': 'New translation',
+				'NW': 'New word type',
+				'NP': 'New IPA'
+			}[col] + ']')
+		#end for
+	
+		self.print_csv_row(header_columns)
+	#end def
 
-	##
-	# Parses text file containing standard text and generates vocabulary list without translations from it.
-	#
-	# @param src path to input file
-	# @param out output stream
-	##
 	def print_word_list(self, lang = None):
+		"""Parses text file containing standard text and generates vocabulary list without translations from it.
+	
+		Keyword arguments:
+		src -- path to input file
+		out -- output stream
+		"""
 		with codecs.open(self._src, 'r', 'utf-8') as f:	
 			text = f.read().replace('\n', ' ') # replace newlines with spaces to avoid cut-off words
 			wordset = set(word for word in re.findall(r"(?u)[\w'-]{3,}", text) if re.match(r'(?u)^[^0-9]+$', word))
@@ -389,21 +432,19 @@ class Wordanalyzer(object):
 		#end with
 	#end def
 	
-	##
-	# Parses CSV table already containing at least two columns with Spanish/English word pairs. The third column is optional and usually contains a 'checked' flag, which
-	# declares whether a word has been already validated. The generated table will contain an extra row for a normalized version of the original Spanish word, an extra row
-	# for translation (from SpanishDict.com) and an extra column for the word type (e.g. noun).
-	#
-	# @param src path to input CSV file
-	# @param out output stream
-	##
 	def print_enhanced_table(self):
+		"""Parses CSV table already containing at least two columns with Spanish/English word pairs. The third column is optional and usually contains a 'checked' flag, which
+		declares whether a word has been already validated. The generated table will contain an extra row for a normalized version of the original Spanish word, an extra row
+		for translation (from SpanishDict.com) and an extra column for the word type (e.g. noun).
+		
+		Keyword arguments:
+		src -- path to input CSV file
+		out -- output stream
+		"""
 		thread_pool = ThreadPool(self.__print_enhanced_row)
 		rows = self._parse_src()
 		
-		self.print_csv_row( # print header
-			['[Original word]', '[Normalized word]', '[Synonyms]', '[Antonyms]', '[Example sentence]', '[Translation]', '[New translation]', '[Word type]', '[New word type]', '[Level]', '[Tags]']
-		)
+		self.print_header_row(rows[0].get_column_format() if len(rows) > 0 else self._column_format.split('|'))
 		for row in rows:
 			if len(row) < 2:
 				print('Skip incomplete row')
@@ -419,10 +460,11 @@ class Wordanalyzer(object):
 	#end def
 	
 	def print_enhanced_table_en(self):
+		"""TODO decribe what this method does."""
 		thread_pool = ThreadPool(self.__print_enhanced_row_en)
 		rows = self._parse_src()
 		
-		self.print_csv_row(['[Original word]', '[Normalized word]', '[IPA]', '[Definition]', '[Translation]', '[New translation]', '[Word type]', '[New word type]', '[Tags]']) # print header
+		self.print_header_row(rows[0].get_column_format() if len(rows) > 0 else self._column_format.split('|'))
 		for row in rows:
 			if len(row) < 2:
 				print('Skip incomplete row')
@@ -438,10 +480,11 @@ class Wordanalyzer(object):
 	#end def
 	
 	def print_enhanced_table_de(self):
+		"""TODO decribe what this method does."""
 		thread_pool = ThreadPool(self.__print_enhanced_row_de)
 		rows = self._parse_src()
 
-		self.print_csv_row(['[Original word]', '[IPA]', '[Word type]']) # print header
+		self.print_header_row(rows[0].get_column_format() if len(rows) > 0 else self._column_format.split('|'))
 		for row in rows:
 			if len(row) < 2:
 				print('Skip incomplete row')
@@ -457,10 +500,11 @@ class Wordanalyzer(object):
 	#end def
 	
 	def print_table_with_ipa_en(self):
+		"""TODO decribe what this method does."""
 		thread_pool = ThreadPool(self.__print_row_with_ipa)
 		rows = self._parse_src()
 
-		self.print_csv_row(['[Original word]', '[IPA]', '[Word type]']) # print header
+		self.print_header_row(rows[0].get_column_format() if len(rows) > 0 else self._column_format.split('|'))
 		for row in rows:
 			if len(row) < 1:
 				print('Skip incomplete row')
@@ -476,10 +520,11 @@ class Wordanalyzer(object):
 	#end def
 	
 	def print_table_with_ipa_de(self):
+		"""TODO decribe what this method does."""
 		thread_pool = ThreadPool(self.__print_row_with_ipa)
 		rows = self._parse_src()
 
-		self.print_csv_row(['[Original word]', '[IPA]', '[Word type]']) # print header
+		self.print_header_row(rows[0].get_column_format() if len(rows) > 0 else self._column_format.split('|'))
 		for row in rows:
 			if len(row) < 1:
 				print('Skip incomplete row')
@@ -495,9 +540,10 @@ class Wordanalyzer(object):
 	#end def
 	
 	def print_table_with_phonetics_es(self):
+		"""TODO decribe what this method does."""
 		rows = self._parse_src()
 		
-		self.print_csv_row(['[Original word]', '[Pronounciation]', '[Translation]', '[Word type]']) # print header
+		self.print_header_row(rows[0].get_column_format() if len(rows) > 0 else self._column_format.split('|'))
 		for row in rows:
 			if len(row) < 1:
 				print('Skip incomplete row')
@@ -510,6 +556,11 @@ class Wordanalyzer(object):
 	
 	
 	def print_conjugation_table(self, tenses):
+		"""TODO decribe what this method does.
+	
+		Keyword arguments:
+		tenses -- TODO describe what this argument is about
+		"""	
 		thread_pool = ThreadPool(self.__print_conjugation_table)
 		rows = self._parse_src()
 		
@@ -531,6 +582,11 @@ class Wordanalyzer(object):
 	#end def
 	
 	def print_word_array(self, lang_code):
+		"""TODO decribe what this method does.
+	
+		Keyword arguments:
+		lang_code -- TODO describe what this argument is about
+		"""
 		rows = self._parse_src()
 
 		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION_%s = set(sorted([\n' % lang_code) # print header
@@ -571,6 +627,7 @@ class Wordanalyzer(object):
 	#end def
 	
 	def print_new_words_es(self):
+		"""TODO decribe what this method does."""
 		for row in self._parse_src():
 			words = set([Translator.normalize_word(word) for word in Translator.resolve_word_list(row.original_word)])
 			
@@ -583,6 +640,7 @@ class Wordanalyzer(object):
 	#end def
 	
 	def print_new_words_en(self):
+		"""TODO decribe what this method does."""
 		for row in self._parse_src():
 			word = Translator.strip_annotations(row.original_word).lower() # normalize entry
 			
@@ -594,8 +652,12 @@ class Wordanalyzer(object):
 		#end if
 	#end def
 	
-	# prints rows from [newfile] that are not part of [self._src]
 	def print_difference(self, newfile):
+		"""Prints rows from [newfile] that are not part of [self._src].
+	
+		Keyword arguments:
+		newfile -- path string to the file which should be compared to the other one
+		"""
 		total_count = 0
 		new_count   = 0
 		ignore = [row.original_word.strip().lower() for row in self._parse_src()] # [(row.original_word[3:] if row.original_word.startswith('to ') else row.original_word).strip().lower() for row in self._parse_src()]
@@ -618,12 +680,15 @@ class Wordanalyzer(object):
 	#end def
 	
 	def print_commons_marked(self, diff_file):
+		"""TODO decribe what this method does.
+	
+		Keyword arguments:
+		diff_file -- TODO describe what this argument is about
+		"""	
 		rows = self._parse_src()
 		marked = Wordanalyzer.get_normalized_words(self._reader.parse(diff_file))
 		
-		self.print_csv_row( # print header
-			['[Original word]', '[Synonyms]', '[Antonyms]', '[Example sentence]', '[Translation]', '[Word type]', '[Level]', '[Tags]']
-		)
+		self.print_header_row(rows[0].get_column_format() if len(rows) > 0 else self._column_format.split('|'))
 		for row in rows:
 			normalized = Translator.normalize_word(row.original_word)
 			
@@ -647,6 +712,7 @@ class Wordanalyzer(object):
 	#end def
 	
 	def print_without_duplicates(self):
+		"""TODO decribe what this method does."""	
 		total_count = 0
 		new_count   = 0
 		rows = self._parse_src()
@@ -675,6 +741,12 @@ class Wordanalyzer(object):
 	#end def
 	
 	def __print_word_row(self, result, row):
+		"""TODO decribe what this method does.
+	
+		Keyword arguments:
+		result -- TODO describe what this argument is about
+		row -- TODO describe what this argument is about
+		"""
 		row.append(u'unknown' if result['normalized'] == None else result['normalized'])
 		row.append(u'unknown' if result['translation'] == None else result['translation'])
 		row.append(u'' if result['wordtype'] == None else result['wordtype'])
@@ -683,6 +755,12 @@ class Wordanalyzer(object):
 	#end def
 	
 	def __print_enhanced_row(self, result, row):
+		"""TODO decribe what this method does.
+	
+		Keyword arguments:
+		result -- TODO describe what this argument is about
+		row -- TODO describe what this argument is about
+		"""
 		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
 		translation = result['translation']
 		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
@@ -701,6 +779,12 @@ class Wordanalyzer(object):
 	#end def
 	
 	def __print_enhanced_row_en(self, result, row):
+		"""TODO decribe what this method does.
+	
+		Keyword arguments:
+		result -- TODO describe what this argument is about
+		row -- TODO describe what this argument is about
+		"""
 		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
 		translation = result['translation']
 		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
@@ -719,25 +803,44 @@ class Wordanalyzer(object):
 	#end def
 	
 	def __print_enhanced_row_de(self, result, row):
+		"""TODO decribe what this method does.
+	
+		Keyword arguments:
+		result -- TODO describe what this argument is about
+		row -- TODO describe what this argument is about
+		"""
 		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
 		ipa         = u'{unknown}' if result['ipa'] == None else result['ipa']
 		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
 
 		row.normalized_word = normalized
-		row.ipa             = ipa
+		row.new_ipa         = ipa
 		row.new_wordtype    = wordtype
 
 		self.print_csv_row(row)
 	#end def
 	
 	def __print_row_with_ipa(self, result, row):
+		"""TODO decribe what this method does.
+	
+		Keyword arguments:
+		result -- TODO describe what this argument is about
+		row -- TODO describe what this argument is about
+		"""
 		if result != None:
-			row.ipa = result
+			row.new_ipa = result
 		#end if
+		
 		self.print_csv_row(row)
 	#end def
 	
 	def __print_conjugation_table(self, result, row):
+		"""TODO decribe what this method does.
+	
+		Keyword arguments:
+		result -- TODO describe what this argument is about
+		row -- TODO describe what this argument is about
+		"""
 		if result != None:
 			row.extend(result)
 		#end if
@@ -769,7 +872,7 @@ def main(argv):
 		print('\t--mark-common             prints words from cvs file [input file] and marks those that also exist in [diff file] with a tag')
 		print('\t--remove-dupl             prints words from cvs file [input] without duplicate rows')
 		print
-		print('Column identifiers: [TODO implement]')
+		print('Column identifiers:')
 		print('\tO - original language (e.g. Spanish)')
 		print('\tP - phonetic transcription in IPA')
 		print('\tS - synonyms')
