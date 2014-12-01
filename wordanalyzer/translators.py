@@ -16,7 +16,7 @@ class Translator(object):
 		'Accept-Language' : 'es-419,es',
 		'Content-type' : 'application/x-www-form-urlencoded; charset=utf-8'
 	}
-	WORD_PATTERN = re.compile(r'(?:(el/la|el|la) )?(\w[\w ]+)(?:, -(\w+))?', re.UNICODE)
+	WORD_PATTERN = re.compile(r'(?:(el/la|el|la) )?(\w[\w\(\)/ ]+)(?:, -(\w+))?', re.UNICODE)
 	ANNOTATION_PATTERN = re.compile(r' ?\[[\w\.]*\]', re.UNICODE) # detects vocabulary annotations between brackets
 	
 	# Strips all extras like annotations, articles etc.
@@ -32,7 +32,7 @@ class Translator(object):
 	@staticmethod
 	def resolve_word_list(string):
 		words = []
-		sections = Translator.strip_annotations(string).split(';')
+		sections = Translator.strip_annotations(string).split(u';')
 		
 		for section in sections:
 			for group in Translator.WORD_PATTERN.findall(section):
@@ -56,7 +56,7 @@ class Translator(object):
 	
 	@staticmethod
 	def strip_annotations(string):
-		return Translator.ANNOTATION_PATTERN.sub('', string)
+		return Translator.ANNOTATION_PATTERN.sub(u'', string)
 	#end def
 	
 	def __init__(self, url_template, encoding = 'utf-8', headers = STD_HEADERS):

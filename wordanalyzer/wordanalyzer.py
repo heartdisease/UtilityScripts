@@ -5,7 +5,7 @@ import sys
 import codecs
 
 from utils import CsvReader, ThreadPool, Processable
-from translators import SpanishdictCom, DixOsolaComDe, DixOsolaComEn, SpanishDictConjugator, DixOsolaComConjugator, DeWiktionaryOrg, EnWiktionaryOrg, OxfordDictionary, DictCc
+from translators import Translator, SpanishdictCom, DixOsolaComDe, DixOsolaComEn, SpanishDictConjugator, DixOsolaComConjugator, DeWiktionaryOrg, EnWiktionaryOrg, OxfordDictionary, DictCc
 import wordlist_es
 import wordlist_en
 
@@ -589,22 +589,22 @@ class Wordanalyzer(object):
 		"""
 		rows = self._parse_src()
 
-		self._ostream.write('#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION_%s = set(sorted([\n' % lang_code) # print header
+		self._ostream.write(u'#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION_%s = set(sorted([\n' % lang_code) # print header
 		first_row = True
 		if lang_code == 'ES':
 			for row in rows:
 				for word in Translator.resolve_word_list(row.original_word):
-					word = Translator.strip_annotations(word).lower() # normalize entry
+					word = word.lower() # normalize entry
 			
 					if first_row:
-						self._ostream.write('\t  u\'')
+						self._ostream.write(u'\t  u\'')
 						first_row = False
 					else:
-						self._ostream.write('\t, u\'')
+						self._ostream.write(u'\t, u\'')
 					#end if
 					
-					self._ostream.write(word.replace('\'', '\\\''))
-					self._ostream.write('\'\n')
+					self._ostream.write(word.replace(u'\'', u'\\\''))
+					self._ostream.write(u'\'\n')
 				#end for
 			#end for
 		else:
@@ -612,18 +612,18 @@ class Wordanalyzer(object):
 				word = Translator.strip_annotations(row.original_word).lower() # normalize entry
 			
 				if first_row:
-					self._ostream.write('\t  u\'')
+					self._ostream.write(u'\t  u\'')
 					first_row = False
 				else:
-					self._ostream.write('\t, u\'')
+					self._ostream.write(u'\t, u\'')
 				#end if
 			
-				self._ostream.write(word.replace('\'', '\\\''))
+				self._ostream.write(word.replace(u'\'', u'\\\''))
 				self._ostream.write('\'\n')
 			#end for
 		#end if
 		
-		self._ostream.write(']))\n')
+		self._ostream.write(u']))\n')
 	#end def
 	
 	def print_new_words_es(self):
