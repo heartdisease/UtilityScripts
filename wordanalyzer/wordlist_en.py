@@ -1,5 +1,5 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+
 WORD_COLLECTION_EN = set(sorted([
 	  u'culprit'
 	, u'cunning'

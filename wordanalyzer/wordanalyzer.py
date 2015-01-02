@@ -1,11 +1,12 @@
-#!/usr/bin/python2.7
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
 import re
 import sys
 import codecs
 
 from utils import CsvReader, ThreadPool, Processable
+from arguments import CommandLineParser
 from translators import Translator, SpanishdictCom, DixOsolaComDe, DixOsolaComEn, SpanishDictConjugator, DixOsolaComConjugator, DeWiktionaryOrg, EnWiktionaryOrg, OxfordDictionary, DictCc
+
 import wordlist_es
 import wordlist_en
 
@@ -14,19 +15,19 @@ import wordlist_en
 class SpanishWordAnalyzer(object):
 
 	SPANISH_TO_GERMAN = [ # any occurance of the letter x will not be replaced due to the unpredictability of its pronounciation (h and y need special treatment)
-		(u'ch', u'tsch'), (u'cc', u'ks'), (u'j', u'ch'), (u'ñ', u'nj'), (u'll', u'j'), (u'v', u'b'), (u'z', u's'),
-		(u'ca', u'ka'), (u'cá', u'ká'), (u'co', u'ko'), (u'có', u'kó'), (u'cu', u'ku'), (u'cú', u'kú'),
-		(u'ce', u'se'), (u'cé', u'sé'), (u'ci', u'si'), (u'cí', u'sí'),
-		(u'que', u'ke'), (u'qué', u'ké'), (u'qui', u'ki'), (u'quí', u'kí'),
-		(u'ge', u'che'), (u'gé', u'ché'), (u'gi', u'chi'), (u'gí', u'chí'),
-		(u'gue', u'ge'), (u'gué', u'gé'), (u'gui', u'gi'), (u'guí', u'gí'),
-		(u'güe', u'gue'), (u'güé', u'gué'), (u'güi', u'gui'), (u'güí', u'guí'),
-		(u'eu', u'e·u'), (u'éu', u'é·u'), (u'eú', u'e·ú'),
-		(u'ei', u'e·i'), (u'éi', u'é·i'), (u'eí', u'e·í'),
-		(u'ie', u'i·e'), (u'íe', u'í·e'), (u'ié', u'i·é')
+		('ch', 'tsch'), ('cc', 'ks'), ('j', 'ch'), ('ñ', 'nj'), ('ll', 'j'), ('v', 'b'), ('z', 's'),
+		('ca', 'ka'), ('cá', 'ká'), ('co', 'ko'), ('có', 'kó'), ('c', 'k'), ('cú', 'kú'),
+		('ce', 'se'), ('cé', 'sé'), ('ci', 'si'), ('cí', 'sí'),
+		('que', 'ke'), ('qué', 'ké'), ('qui', 'ki'), ('quí', 'kí'),
+		('ge', 'che'), ('gé', 'ché'), ('gi', 'chi'), ('gí', 'chí'),
+		('gue', 'ge'), ('gué', 'gé'), ('gui', 'gi'), ('guí', 'gí'),
+		('güe', 'gue'), ('güé', 'gué'), ('güi', 'gui'), ('güí', 'guí'),
+		('e', 'e·'), ('é', 'é·'), ('eú', 'e·ú'),
+		('ei', 'e·i'), ('éi', 'é·i'), ('eí', 'e·í'),
+		('ie', 'i·e'), ('íe', 'í·e'), ('ié', 'i·é')
 	]
 	ACCENT_CONVERSION = {
-		u'a' : u'á', u'e' : u'é', u'i' : u'í', u'o' : u'ó', u'u' : u'ú'
+		'a' : 'á', 'e' : 'é', 'i' : 'í', 'o' : 'ó', '' : 'ú'
 	}
 
 	def __init__(self, word):
@@ -36,8 +37,8 @@ class SpanishWordAnalyzer(object):
 	#end def
 	
 	def phonetic_de(self):
-		#phonetics = u' '.join([Wordanalyzer.add_accent_es(word) for word in re.split(ur'[ \/\(\)\[\]¡!¿?;\.:_-]', re.sub(ur'(?:[^c])h', u'', word.lower())) if len(word) > 0])
-		phonetics = re.sub(ur'(?:[^c])h', u'', self._word.lower())
+		#phonetics = ' '.join([Wordanalyzer.add_accent_es(word) for word in re.split(r'[ \/\(\)\[\]¡!¿?;\.:_-]', re.sub(r'(?:[^c])h', '', word.lower())) if len(word) > 0])
+		phonetics = re.sub(r'(?:[^c])h', '', self._word.lower())
 		words_with_accents = [(self._word, SpanishWordAnalyzer.__add_accent(word)) for self._word in re.findall(r'(?u)\w+', phonetics)]
 		
 		for word_pair in words_with_accents:
@@ -50,7 +51,7 @@ class SpanishWordAnalyzer(object):
 			phonetics = phonetics.replace(conversion[0], conversion[1])
 		#end for
 		
-		return re.sub(ur'y ', 'i ', re.sub(ur'y$', 'i', phonetics)).replace(u'y', u'j')
+		return re.sub(r'y ', 'i ', re.sub(r'y$', 'i', phonetics)).replace('y', 'j')
 	#end def
 	
 	def syllables(self):
@@ -75,19 +76,19 @@ class SpanishWordAnalyzer(object):
 	
 	@staticmethod
 	def is_vowel(char):
-		return char == u'a' or char == u'e' or char == u'i' or char == u'o' or char == u'u' \
-			or char == u'á' or char == u'é' or char == u'í' or char == u'ó' or char == u'ú'
+		return char == 'a' or char == 'e' or char == 'i' or char == 'o' or char == '' \
+			or char == 'á' or char == 'é' or char == 'í' or char == 'ó' or char == 'ú'
 	#end def
 	
 	@staticmethod
 	def has_accent(char):
-		return char == u'á' or char == u'é' or char == u'í' or char == u'ó' or char == u'ú'
+		return char == 'á' or char == 'é' or char == 'í' or char == 'ó' or char == 'ú'
 	#end def
 	
 	@staticmethod
 	def contains_accent(word):
 		for char in word:
-			if char == u'á' or char == u'é' or char == u'í' or char == u'ó' or char == u'ú':
+			if char == 'á' or char == 'é' or char == 'í' or char == 'ó' or char == 'ú':
 				return True
 			#end if
 		#end for
@@ -109,10 +110,10 @@ class SpanishWordAnalyzer(object):
 						self._stressed = len(self._syllables)
 					#end if
 				
-					if not SpanishWordAnalyzer.is_vowel(syllable[-1]) or c == u'i' or c == u'u':
+					if not SpanishWordAnalyzer.is_vowel(syllable[-1]) or c == 'i' or c == '':
 						syllable += c
 					else:
-						if syllable[-1] == u'u' or syllable[-2] == u'q':
+						if syllable[-1] == '' or syllable[-2] == 'q':
 							syllable += c
 						else:
 							self._syllables.append(syllable)
@@ -134,7 +135,7 @@ class SpanishWordAnalyzer(object):
 		if self._stressed == -1: # detect accent for words without one
 			if SpanishWordAnalyzer.contains_accent(syllable):
 				self._stressed = len(self._syllables) - 1
-			elif len(self._syllables) > 1 and (syllable == u'n' or syllable == u's' or SpanishWordAnalyzer.is_vowel(syllable)):
+			elif len(self._syllables) > 1 and (syllable == 'n' or syllable == 's' or SpanishWordAnalyzer.is_vowel(syllable)):
 				self._stressed = len(self._syllables) - 2 # accent on penultimate syllable
 			else:
 				self._stressed = len(self._syllables) - 1 # accent on last syllable
@@ -153,7 +154,7 @@ class SpanishWordAnalyzer(object):
 		chars = list(word)
 		for i, char in reversed(list(enumerate(chars))):
 			if Wordanalyzer.is_vowel(char):
-				if last_char == u'n' or last_char == u's':
+				if last_char == 'n' or last_char == 's':
 					if consonants > 1:
 						chars[i] = Wordanalyzer.ACCENT_CONVERSION[char]
 						break
@@ -167,34 +168,30 @@ class SpanishWordAnalyzer(object):
 			#end if
 		#end for
 		
-		return u''.join(chars)
+		return ''.join(chars)
 	#end def
 #end class
 
 class Wordanalyzer(object):
 	"""Main class."""
-	DEFAULT_COLUMN_FORMAT = 'O|M|T'
-	SPANISH_COLUMN_FORMAT = 'O|S|A|E|M|W|L|T'
-	ENGLISH_COLUMN_FORMAT = 'O|P|E|M|W|T'
-	GERMAN_COLUMN_FORMAT  = 'O|M|W|T'
 	CSV_SEPARATOR = ','
 	TEXT_DELIMITER = '"'
-	WORD_SPLIT_REGEX = ur'[ \t-\.,:;!\?\(\)"\'“”]'
+	WORD_SPLIT_REGEX = r'[ \t-\.,:;!\?\(\)"\'“”]'
 	DICT_CC_MODULE = None
 	SPANISH_TO_GERMAN = [ # any occurance of the letter x will not be replaced due to the unpredictability of its pronounciation (h and y need special treatment)
-		(u'ch', u'tsch'), (u'cc', u'ks'), (u'j', u'ch'), (u'ñ', u'nj'), (u'll', u'j'), (u'v', u'b'), (u'z', u's'),
-		(u'ca', u'ka'), (u'cá', u'ká'), (u'co', u'ko'), (u'có', u'kó'), (u'cu', u'ku'), (u'cú', u'kú'),
-		(u'ce', u'se'), (u'cé', u'sé'), (u'ci', u'si'), (u'cí', u'sí'),
-		(u'que', u'ke'), (u'qué', u'ké'), (u'qui', u'ki'), (u'quí', u'kí'),
-		(u'ge', u'che'), (u'gé', u'ché'), (u'gi', u'chi'), (u'gí', u'chí'),
-		(u'gue', u'ge'), (u'gué', u'gé'), (u'gui', u'gi'), (u'guí', u'gí'),
-		(u'güe', u'gue'), (u'güé', u'gué'), (u'güi', u'gui'), (u'güí', u'guí'),
-		(u'eu', u'e·u'), (u'éu', u'é·u'), (u'eú', u'e·ú'),
-		(u'ei', u'e·i'), (u'éi', u'é·i'), (u'eí', u'e·í'),
-		(u'ie', u'i·e'), (u'íe', u'í·e'), (u'ié', u'i·é')
+		('ch', 'tsch'), ('cc', 'ks'), ('j', 'ch'), ('ñ', 'nj'), ('ll', 'j'), ('v', 'b'), ('z', 's'),
+		('ca', 'ka'), ('cá', 'ká'), ('co', 'ko'), ('có', 'kó'), ('c', 'k'), ('cú', 'kú'),
+		('ce', 'se'), ('cé', 'sé'), ('ci', 'si'), ('cí', 'sí'),
+		('que', 'ke'), ('qué', 'ké'), ('qui', 'ki'), ('quí', 'kí'),
+		('ge', 'che'), ('gé', 'ché'), ('gi', 'chi'), ('gí', 'chí'),
+		('gue', 'ge'), ('gué', 'gé'), ('gui', 'gi'), ('guí', 'gí'),
+		('güe', 'gue'), ('güé', 'gué'), ('güi', 'gui'), ('güí', 'guí'),
+		('e', 'e·'), ('é', 'é·'), ('eú', 'e·ú'),
+		('ei', 'e·i'), ('éi', 'é·i'), ('eí', 'e·í'),
+		('ie', 'i·e'), ('íe', 'í·e'), ('ié', 'i·é')
 	]
 	ACCENT_CONVERSION = {
-		u'a' : u'á', u'e' : u'é', u'i' : u'í', u'o' : u'ó', u'u' : u'ú'
+		'a' : 'á', 'e' : 'é', 'i' : 'í', 'o' : 'ó', '' : 'ú'
 	}
 	
 	@staticmethod
@@ -239,7 +236,7 @@ class Wordanalyzer(object):
 	@staticmethod
 	def has_accent(word):
 		for char in word:
-			if char == u'á' or char == u'é' or char == u'í' or char == u'ó' or char == u'ú':
+			if char == 'á' or char == 'é' or char == 'í' or char == 'ó' or char == 'ú':
 				return True
 			#end if
 		#end for
@@ -249,7 +246,7 @@ class Wordanalyzer(object):
 	
 	@staticmethod
 	def is_vowel(char):
-		return char == u'a' or char == u'e' or char == u'i' or char == u'o' or char == u'u'
+		return char == 'a' or char == 'e' or char == 'i' or char == 'o' or char == ''
 	#end def
 	
 	@staticmethod
@@ -263,7 +260,7 @@ class Wordanalyzer(object):
 		chars = list(word)
 		for i, char in reversed(list(enumerate(chars))):
 			if Wordanalyzer.is_vowel(char):
-				if last_char == u'n' or last_char == u's':
+				if last_char == 'n' or last_char == 's':
 					if consonants > 1:
 						chars[i] = Wordanalyzer.ACCENT_CONVERSION[char]
 						break
@@ -277,13 +274,13 @@ class Wordanalyzer(object):
 			#end if
 		#end for
 		
-		return u''.join(chars)
+		return ''.join(chars)
 	#end def
 	
 	@staticmethod
 	def spanish_to_phonetic_de(word):
-		#phonetics = u' '.join([Wordanalyzer.add_accent_es(word) for word in re.split(ur'[ \/\(\)\[\]¡!¿?;\.:_-]', re.sub(ur'(?:[^c])h', u'', word.lower())) if len(word) > 0])
-		phonetics = re.sub(ur'(?:[^c])h', u'', word.lower())
+		#phonetics = ' '.join([Wordanalyzer.add_accent_es(word) for word in re.split(r'[ \/\(\)\[\]¡!¿?;\.:_-]', re.sub(r'(?:[^c])h', '', word.lower())) if len(word) > 0])
+		phonetics = re.sub(r'(?:[^c])h', '', word.lower())
 		words_with_accents = [(word, Wordanalyzer.add_accent_es(word)) for word in re.findall(r'(?u)\w+', phonetics)]
 		
 		for word_pair in words_with_accents:
@@ -296,7 +293,7 @@ class Wordanalyzer(object):
 			phonetics = phonetics.replace(conversion[0], conversion[1])
 		#end for
 		
-		return re.sub(ur'y ', 'i ', re.sub(ur'y$', 'i', phonetics)).replace(u'y', u'j')
+		return re.sub(r'y ', 'i ', re.sub(r'y$', 'i', phonetics)).replace('y', 'j')
 	#end def
 	
 	@staticmethod
@@ -310,26 +307,18 @@ class Wordanalyzer(object):
 		return set([Translator.normalize_word(row.original_word) for row in rows])
 	#end def
 	
-	def __init__(self, src, out = None):
+	def __init__(self, column_format, src, out = None):
 		self._src = src
 		self._ostream = sys.stdout if out == None else codecs.open(out, 'w', 'utf-8')
-		self.set_column_format(Wordanalyzer.DEFAULT_COLUMN_FORMAT)
+		self._column_format = column_format
+		
+		self._reader = CsvReader(Wordanalyzer.CSV_SEPARATOR, Wordanalyzer.TEXT_DELIMITER, column_format)
 	#end def
 	
 	def close(self):
 		if self._ostream != sys.stdout:
 			self._ostream.close()
 		#end if
-	#end def
-	
-	def set_column_format(self, column_format):
-		"""TODO decribe what this method does.
-	
-		Keyword arguments:
-		column_format -- TODO describe what this argument is about
-		"""		
-		self._column_format = column_format
-		self._reader = CsvReader(Wordanalyzer.CSV_SEPARATOR, Wordanalyzer.TEXT_DELIMITER, column_format)
 	#end def
 	
 	def _parse_src(self):
@@ -369,7 +358,7 @@ class Wordanalyzer(object):
 		header_columns = []
 		
 		for col in column_format:
-			header_columns.append('[' + {
+			header_columns.append('[%s]' % {
 				'O': 'Original word',
 				'P': 'IPA',
 				'S': 'Synonyms',
@@ -385,7 +374,7 @@ class Wordanalyzer(object):
 				'NM': 'New translation',
 				'NW': 'New word type',
 				'NP': 'New IPA'
-			}[col] + ']')
+			}[col])
 		#end for
 	
 		self.print_csv_row(header_columns)
@@ -564,7 +553,7 @@ class Wordanalyzer(object):
 		thread_pool = ThreadPool(self.__print_conjugation_table)
 		rows = self._parse_src()
 		
-		self.print_csv_row([u'[Infinitive]', u'[yo]', u'[tú]', u'[el/ella/usted]', u'[nosotros, -as]', u'[vosotros, -as]', u'[ellos/ellas/ustedes]', u'[Tense]']) # print header
+		self.print_csv_row(['[Infinitive]', '[yo]', '[tú]', '[el/ella/usted]', '[nosotros, -as]', '[vosotros, -as]', '[ellos/ellas/ustedes]', '[Tense]']) # print header
 		for row in rows:
 			if len(row) < 1:
 				print('Skip incomplete row')
@@ -589,22 +578,22 @@ class Wordanalyzer(object):
 		"""
 		rows = self._parse_src()
 
-		self._ostream.write(u'#!/usr/bin/python\n# -*- coding: utf-8 -*-\nWORD_COLLECTION_%s = set(sorted([\n' % lang_code) # print header
+		self._ostream.write('#!/usr/bin/env python3\n\nWORD_COLLECTION_%s = set(sorted([\n' % lang_code) # print header
 		first_row = True
-		if lang_code == 'ES':
+		if lang_code == 'es':
 			for row in rows:
 				for word in Translator.resolve_word_list(row.original_word):
 					word = word.lower() # normalize entry
 			
 					if first_row:
-						self._ostream.write(u'\t  u\'')
+						self._ostream.write('\t  u\'')
 						first_row = False
 					else:
-						self._ostream.write(u'\t, u\'')
+						self._ostream.write('\t, u\'')
 					#end if
 					
-					self._ostream.write(word.replace(u'\'', u'\\\''))
-					self._ostream.write(u'\'\n')
+					self._ostream.write(word.replace('\'', '\\\''))
+					self._ostream.write('\'\n')
 				#end for
 			#end for
 		else:
@@ -612,18 +601,18 @@ class Wordanalyzer(object):
 				word = Translator.strip_annotations(row.original_word).lower() # normalize entry
 			
 				if first_row:
-					self._ostream.write(u'\t  u\'')
+					self._ostream.write('\t  u\'')
 					first_row = False
 				else:
-					self._ostream.write(u'\t, u\'')
+					self._ostream.write('\t, u\'')
 				#end if
 			
-				self._ostream.write(word.replace(u'\'', u'\\\''))
+				self._ostream.write(word.replace('\'', '\\\''))
 				self._ostream.write('\'\n')
 			#end for
 		#end if
 		
-		self._ostream.write(u']))\n')
+		self._ostream.write(']))\n')
 	#end def
 	
 	def print_new_words_es(self):
@@ -747,9 +736,9 @@ class Wordanalyzer(object):
 		result -- TODO describe what this argument is about
 		row -- TODO describe what this argument is about
 		"""
-		row.append(u'unknown' if result['normalized'] == None else result['normalized'])
-		row.append(u'unknown' if result['translation'] == None else result['translation'])
-		row.append(u'' if result['wordtype'] == None else result['wordtype'])
+		row.append('unknown' if result['normalized'] == None else result['normalized'])
+		row.append('unknown' if result['translation'] == None else result['translation'])
+		row.append('' if result['wordtype'] == None else result['wordtype'])
 		
 		self.print_csv_row(row)
 	#end def
@@ -761,14 +750,14 @@ class Wordanalyzer(object):
 		result -- TODO describe what this argument is about
 		row -- TODO describe what this argument is about
 		"""
-		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
+		normalized  = '{unknown}' if result['normalized'] == None else result['normalized']
 		translation = result['translation']
-		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
+		wordtype    = '' if result['wordtype'] == None else result['wordtype']
 		
 		if translation == None:
-			translation = u'{unknown}'
+			translation = '{unknown}'
 		elif len(translation) > 0 and translation in row.translation:
-			translation = u'{duplicate} ' + translation
+			translation = '{duplicate} ' + translation
 		#endif
 
 		row.normalized_word = normalized
@@ -785,14 +774,14 @@ class Wordanalyzer(object):
 		result -- TODO describe what this argument is about
 		row -- TODO describe what this argument is about
 		"""
-		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
+		normalized  = '{unknown}' if result['normalized'] == None else result['normalized']
 		translation = result['translation']
-		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
+		wordtype    = '' if result['wordtype'] == None else result['wordtype']
 		
 		if translation == None:
-			translation = u'{unknown}'
+			translation = '{unknown}'
 		elif len(translation) > 0 and translation in row.translation:
-			translation = u'{duplicate} ' + translation
+			translation = '{duplicate} ' + translation
 		#endif
 
 		row.normalized_word = normalized
@@ -809,9 +798,9 @@ class Wordanalyzer(object):
 		result -- TODO describe what this argument is about
 		row -- TODO describe what this argument is about
 		"""
-		normalized  = u'{unknown}' if result['normalized'] == None else result['normalized']
-		ipa         = u'{unknown}' if result['ipa'] == None else result['ipa']
-		wordtype    = u'' if result['wordtype'] == None else result['wordtype']
+		normalized  = '{unknown}' if result['normalized'] == None else result['normalized']
+		ipa         = '{unknown}' if result['ipa'] == None else result['ipa']
+		wordtype    = '' if result['wordtype'] == None else result['wordtype']
 
 		row.normalized_word = normalized
 		row.new_ipa         = ipa
@@ -850,133 +839,50 @@ class Wordanalyzer(object):
 #end class
 
 def main(argv):
-	if not 4 <= len(argv) <= 5:
-		print('Invalid parameter count!')
-		print('wordanalyzer.py [option] [input file] [output file]|[[diff file] [output file]]')
-		print('Options:')
-		print('\t--wordlist-es             prints list of words contained in [input file] (Spanish)')
-		print('\t--wordlist-en             prints list of words contained in [input file] (English)')
-		print('\t--wordlist-de             prints list of words contained in [input file] (German)')
-		print('\t--check-csv-es            prints enhanced version of cvs file [input file] (Spanish)')
-		print('\t--check-csv-en            prints enhanced version of cvs file [input file] (English)')
-		print('\t--check-csv-de            prints enhanced version of cvs file [input file] (German)')
-		print('\t--add-ipa-en              prints enhanced version of cvs file [input file] including IPA annotations (English)')
-		print('\t--add-ipa-de              prints enhanced version of cvs file [input file] including IPA annotations (German)')
-		print('\t--add-phonetic-es         prints enhanced version of cvs file [input file] including annotations for pronounciation in German (Spanish)')
-		print('\t--conjugate-verbs=[TENSE] prints table with conjugated verbs from cvs file [input file] (Spanish)')
-		print('\t--word-array-es           prints python code with list of words from cvs file [input file] (Spanish)')
-		print('\t--word-array-en           prints python code with list of words from cvs file [input file] (English)')
-		print('\t--check-new-es            prints words from cvs file [input file] that are not yet part of the vocabulary collection (see wordlist_es.py) (Spanish)')
-		print('\t--check-new-en            prints words from cvs file [input file] that are not yet part of the vocabulary collection (see wordlist_en.py) (English)')
-		print('\t--diff-csv                prints words from cvs file [diff file] that are not part of csv file [input file]')
-		print('\t--mark-common             prints words from cvs file [input file] and marks those that also exist in [diff file] with a tag')
-		print('\t--remove-dupl             prints words from cvs file [input] without duplicate rows')
-		print
-		print('Column identifiers:')
-		print('\tO - original language (e.g. Spanish)')
-		print('\tP - phonetic transcription in IPA')
-		print('\tS - synonyms')
-		print('\tA - antonyms')
-		print('\tE - example sentence')
-		print('\tD - definition (alternative to plain translation)')
-		print('\tM - meaning/translation (e.g. English)')
-		print('\tW - word type (e.g. verb, noun, etc.)')
-		print('\tL - Level of relevance (0, 1, ... Smaller number = higher relevance)')
-		print('\tT - Tags (Anki)')
-		print
-		print('\t[[ Standard column identifiers for Spanish: %s ]]' % Wordanalyzer.SPANISH_COLUMN_FORMAT)
-		print('\t[[ Standard column identifiers for English: %s ]]' % Wordanalyzer.ENGLISH_COLUMN_FORMAT)
-		print('\t[[ Standard column identifiers for German:  %s ]]' % Wordanalyzer.GERMAN_COLUMN_FORMAT)
-		print
-		print('Conjugation modes:')
-		print('\tFORMAS_BASICAS')
-		print('\tIMPERATIVO')
-		print('\tPRESENTE')
-		print('\tPRETERITO_IMPERFECTO')
-		print('\tPRETERITO_PLUSCUAMPERFECTO')
-		print('\tPRETERITO_INDEFINIDO')
-		print('\tFUTURO_IMPERFECTO')
-		print('\tCONDICIONAL_SIMPLE')
-		print('\tPRESENTE_SUBJUNTIVO')
-		print('\tPRETERITO_IMPERFECTO_SUBJUNTIVO')
-		
-		#analyser = SpanishWordAnalyzer(u'bloqueó')
-		#print(' - '.join(analyser.syllables()))
-		#print(analyser.stressed_syllable())
-		
-		#trans = Wordanalyzer.get_translation_en('ludicrous')
-		#print(trans['normalized'], trans['translation'], trans['wordtype'])
-		
-		#print Wordanalyzer.get_ipa_en('gullible')
-		
-		#print(Wordanalyzer.add_accent_es('mojado'))
-		
-		exit(1)
-	#end if
-
-	mode = argv[1]
-	input_file  = argv[2]
-	output_file = None
-	diff_file   = None
-	if len(argv) == 5:
-		diff_file   = argv[3]
-		output_file = argv[4]
-	else:
-		output_file = argv[3]
-	#end if	
+	arguments = CommandLineParser(argv)
 	
-	analyzer = Wordanalyzer(input_file) if output_file == '-' else Wordanalyzer(input_file, output_file)
+	analyzer = Wordanalyzer(arguments.column_format(), arguments.input_file()) if arguments.output_file() == '-' \
+		else Wordanalyzer(arguments.column_format(), arguments.input_file(), arguments.output_file())
 	
-	if mode == '--wordlist-es':
-		analyzer.set_column_format(Wordanalyzer.SPANISH_COLUMN_FORMAT)
-		analyzer.print_word_list('es')
-	elif mode == '--wordlist-en':
-		analyzer.set_column_format(Wordanalyzer.ENGLISH_COLUMN_FORMAT)
-		analyzer.print_word_list('en')
-	elif mode == '--wordlist-de':
-		analyzer.set_column_format(Wordanalyzer.GERMAN_COLUMN_FORMAT)
-		analyzer.print_word_list('de')
-	elif mode == '--check-csv-es':
-		analyzer.set_column_format(Wordanalyzer.SPANISH_COLUMN_FORMAT)
-		analyzer.print_enhanced_table()
-	elif mode == '--check-csv-en':
-		analyzer.set_column_format(Wordanalyzer.ENGLISH_COLUMN_FORMAT)
-		analyzer.print_enhanced_table_en()
-	elif mode == '--check-csv-de':
-		analyzer.set_column_format(Wordanalyzer.GERMAN_COLUMN_FORMAT)
-		analyzer.print_enhanced_table_de()
-	elif mode == '--add-ipa-en':
-		analyzer.set_column_format(Wordanalyzer.ENGLISH_COLUMN_FORMAT)
-		analyzer.print_table_with_ipa_en()
-	elif mode == '--add-ipa-de':
-		analyzer.set_column_format(Wordanalyzer.GERMAN_COLUMN_FORMAT)
-		analyzer.print_table_with_ipa_de()
-	elif mode == '--add-phonetic-es':
-		analyzer.set_column_format(Wordanalyzer.SPANISH_COLUMN_FORMAT)
-		analyzer.print_table_with_phonetics_es()
-	elif mode.startswith('--conjugate-verbs='):
-		identifier = mode[18:] # 18 = length of mode string
-		tense = getattr(DixOsolaComConjugator, identifier) # retrieve constant with reflection
-		
-		analyzer.set_column_format(Wordanalyzer.SPANISH_COLUMN_FORMAT)
-		analyzer.print_conjugation_table([tense])
-	elif mode == '--word-array-es':
-		analyzer.print_word_array('ES')
-	elif mode == '--word-array-en':
-		analyzer.print_word_array('EN')
-	elif mode == '--check-new-es':
-		analyzer.print_new_words_es()
-	elif mode == '--check-new-en':
-		analyzer.print_new_words_en()
-	elif mode == '--diff-csv':
-		analyzer.print_difference(diff_file)
-	elif mode == '--mark-common': # only works for spanish so far
-		analyzer.set_column_format(Wordanalyzer.SPANISH_COLUMN_FORMAT)
-		analyzer.print_commons_marked(diff_file)
-	elif mode == '--remove-dupl':
+	if arguments.wordlist():
+		analyzer.print_word_list(arguments.lang())
+	elif arguments.check_csv():
+		if arguments.lang() == 'es':
+			analyzer.print_enhanced_table()
+		elif arguments.lang() == 'en':
+			analyzer.print_enhanced_table_en()
+		elif arguments.lang() == 'de':
+			analyzer.print_enhanced_table_de()
+		#end if
+	elif arguments.add_ipa():
+		if arguments.lang() == 'en':
+			analyzer.print_table_with_ipa_en()
+		elif arguments.lang() == 'de':
+			analyzer.print_table_with_ipa_de()
+		#end if
+	elif arguments.add_phonetic():
+		if arguments.lang() == 'es':
+			analyzer.print_table_with_phonetics_es()
+		#end if
+	elif arguments.conjugate_verbs():
+		analyzer.print_conjugation_table([arguments.tense()])
+	elif arguments.word_array():
+		analyzer.print_word_array(arguments.lang())
+	elif arguments.check_new():
+		if arguments.lang() == 'es':
+			analyzer.print_new_words_es()
+		elif arguments.lang() == 'en':
+			analyzer.print_new_words_en()
+		#end if
+	elif arguments.diff_csv():
+		analyzer.print_difference(arguments.diff_file())
+	elif arguments.mark_common(): # only works for spanish so far
+		analyzer.print_commons_marked(arguments.diff_file())
+	elif arguments.remove_dupl():
 		analyzer.print_without_duplicates()
 	else:
-		print('Invalid mode!')
+		print('No mode was selected!')
+		CommandLineParser.print_help()
 		exit(1)
 	#end if
 	

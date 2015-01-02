@@ -1,7 +1,8 @@
-#!/usr/bin/python2.7
-# -*- coding: utf-8 -*-
-from multiprocessing import Process, Queue
+#!/usr/bin/env python3
+
 import codecs
+
+from multiprocessing import Process, Queue
 
 class CsvRow(object):
 
