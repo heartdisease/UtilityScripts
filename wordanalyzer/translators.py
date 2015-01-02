@@ -1,9 +1,10 @@
-#!/usr/bin/python2.7
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python3
+import re
+import urllib.parse
+import urllib.request
+
 from pyquery import PyQuery as pq
 from lxml import etree
-import re
-import urllib2
 
 class Translator(object):
 
@@ -32,7 +33,7 @@ class Translator(object):
 	@staticmethod
 	def resolve_word_list(string):
 		words = []
-		sections = Translator.strip_annotations(string).split(u';')
+		sections = Translator.strip_annotations(string).split(';')
 		
 		for section in sections:
 			for group in Translator.WORD_PATTERN.findall(section):
@@ -56,7 +57,7 @@ class Translator(object):
 	
 	@staticmethod
 	def strip_annotations(string):
-		return Translator.ANNOTATION_PATTERN.sub(u'', string)
+		return Translator.ANNOTATION_PATTERN.sub('', string)
 	#end def
 	
 	def __init__(self, url_template, encoding = 'utf-8', headers = STD_HEADERS):
@@ -71,13 +72,13 @@ class Translator(object):
 	#end def
 	
 	def __get_content_from_url(self, get_data):
-		url = self._url_template % urllib2.quote(get_data.encode(self._encoding))
+		url = self._url_template % urllib.parse.quote(get_data.encode(self._encoding))
 		content = None
 		
 		try:
-			response = urllib2.urlopen(urllib2.Request(url, headers=self._headers))
+			response = urllib.request.urlopen(urllib.request.Request(url, headers=self._headers))
 			content  = response.read()
-			return unicode(content, self._encoding).replace('\n', ' ')
+			return str(content).replace('\n', ' ') #unicode(content, self._encoding).replace('\n', ' ')
 		except UnicodeDecodeError as e:
 			if content == None:
 				raise
@@ -117,7 +118,7 @@ class SpanishdictCom(Translator):
 	#end def
 	
 	def __init__(self):
-		Translator.__init__(self, u'http://www.spanishdict.com/translate/%s')
+		Translator.__init__(self, 'http://www.spanishdict.com/translate/%s')
 	#end def
 	
 	##
@@ -140,19 +141,19 @@ class SpanishdictCom(Translator):
 			wordtype     = None
 			head_word    = result_block.find('div.dictionary_word > span.head_word').text()
 			
-			if partofspeach == None or not u' ' in partofspeach:
+			if partofspeach == None or not ' ' in partofspeach:
 				wordtype = partofspeach
 			else:				
-				if u'sustantivo' in partofspeach:
-					wordtype = u'sustantivo'
-				elif u'verbo' in partofspeach:
-					wordtype = u'verbo'
-				elif u'adverbio' in partofspeach:
-					wordtype = u'adverbio'
-				elif u'adjetivo' in partofspeach:
-					wordtype = u'adjetivo'
+				if 'sustantivo' in partofspeach:
+					wordtype = 'sustantivo'
+				elif 'verbo' in partofspeach:
+					wordtype = 'verbo'
+				elif 'adverbio' in partofspeach:
+					wordtype = 'adverbio'
+				elif 'adjetivo' in partofspeach:
+					wordtype = 'adjetivo'
 				else:
-					wordtype = partofspeach.split(u' ')[0]
+					wordtype = partofspeach.split(' ')[0]
 				#end if
 			#end if
 			
@@ -168,26 +169,26 @@ class SpanishdictCom(Translator):
 			#end if
 			#normalized = SpanishdictCom.remove_duplicates(normalized)
 			
-			if wordtype == u'sustantivo' or wordtype == u'noun':
+			if wordtype == 'sustantivo' or wordtype == 'noun':
 				if partofspeach == None: # special case where gender declaration is missing
-					normalized = u'?? ' + normalized
+					normalized = '?? ' + normalized
 				else:
-					is_masculine = u'masculine' in partofspeach or u'masculino' in partofspeach
-					is_feminine  = u'feminine' in partofspeach or u'femenino' in partofspeach
+					is_masculine = 'masculine' in partofspeach or 'masculino' in partofspeach
+					is_feminine  = 'feminine' in partofspeach or 'femenino' in partofspeach
 				
 					if is_masculine and is_feminine:
-						normalized = u'el/la ' + normalized
+						normalized = 'el/la ' + normalized
 					elif is_masculine:
-						normalized = u'el ' + normalized
+						normalized = 'el ' + normalized
 					elif is_feminine:
 						# use article 'el' if noun starts with a-sound (still buggy!)
-						if normalized.startswith(u'a') or normalized.startswith(u'ha'):
-							normalized = u'el ' + normalized + ' [fem.]'
+						if normalized.startswith('a') or normalized.startswith('ha'):
+							normalized = 'el ' + normalized + ' [fem.]'
 						else:
-							normalized = u'la ' + normalized
+							normalized = 'la ' + normalized
 						#end if
 					else: # special case where gender declaration is missing (add manually)
-						normalized = u'?? ' + normalized
+						normalized = '?? ' + normalized
 					#end if
 				#end if
 			#end if
@@ -196,20 +197,20 @@ class SpanishdictCom(Translator):
 				translation = translation.replace(';', ',').replace(' , ', ', ')
 			#end if
 		else:
-			print(u'Invalid response for "' + word + '".')
+			print('Invalid response for "' + word + '".')
 		#end if
 		
 		# translate english word type to spanish due to site inconsistencies
-		if wordtype == u'noun':
-			wordtype = u'sustantivo'
-		elif wordtype == u'verb':
-			wordtype = u'verbo'
-		elif wordtype == u'adjective':
-			wordtype = u'adjetivo'
-		elif wordtype == u'adverb':
-			wordtype = u'adverbio'
-		elif wordtype == u'pronoun':
-			wordtype = u'pronombre'
+		if wordtype == 'noun':
+			wordtype = 'sustantivo'
+		elif wordtype == 'verb':
+			wordtype = 'verbo'
+		elif wordtype == 'adjective':
+			wordtype = 'adjetivo'
+		elif wordtype == 'adverb':
+			wordtype = 'adverbio'
+		elif wordtype == 'pronoun':
+			wordtype = 'pronombre'
 		#endif
 	
 		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
@@ -219,7 +220,7 @@ class SpanishdictCom(Translator):
 class DixOsolaComDe(Translator):
 
 	def __init__(self):
-		Translator.__init__(self, u'http://dix.osola.com/index.php?search=%s', 'iso-8859-1')
+		Translator.__init__(self, 'http://dix.osola.com/index.php?search=%s', 'iso-8859-1')
 	#end def
 	
 	##
@@ -264,14 +265,14 @@ class DixOsolaComDe(Translator):
 					if translation == None:
 						translation = german_row
 					else:
-						translation += u', ' + german_row
+						translation += ', ' + german_row
 					#end if
 				else:
 					break # found all translations
 				#end if
 			#end for
 		else:
-			print(u'Invalid response for "' + word + '".')
+			print('Invalid response for "' + word + '".')
 		#end if
 	
 		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
@@ -281,7 +282,7 @@ class DixOsolaComDe(Translator):
 class DixOsolaComEn(Translator):
 
 	def __init__(self):
-		Translator.__init__(self, u'http://www.diccionario-ingles.info/index.php?search=%s', 'iso-8859-1')
+		Translator.__init__(self, 'http://www.diccionario-ingles.info/index.php?search=%s', 'iso-8859-1')
 	#end def
 	
 	##
@@ -328,14 +329,14 @@ class DixOsolaComEn(Translator):
 					if translation == None:
 						translation = english_row
 					else:
-						translation += u', ' + english_row
+						translation += ', ' + english_row
 					#end if
 				else:
 					break # found all translations
 				#end if
 			#end for
 		else:
-			print(u'Invalid response for "' + word + '".')
+			print('Invalid response for "' + word + '".')
 		#end if
 	
 		return { 'normalized' : normalized if normalized != None else word, 'translation' : translation, 'wordtype' : wordtype }
@@ -345,7 +346,7 @@ class DixOsolaComEn(Translator):
 class SpanishDictConjugator(Translator):
 
 	def __init__(self):
-		Translator.__init__(self, u'http://www.spanishdict.com/conjugate/%s')
+		Translator.__init__(self, 'http://www.spanishdict.com/conjugate/%s')
 	#end def
 	
 	def get_conjugation(self, verb, tense):
@@ -367,7 +368,7 @@ class DixOsolaComConjugator(Translator):
 	PRETERITO_IMPERFECTO_SUBJUNTIVO = 15
 
 	def __init__(self):
-		Translator.__init__(self, u'http://dix.osola.com/v.php?search=%s', 'iso-8859-1')
+		Translator.__init__(self, 'http://dix.osola.com/v.php?search=%s', 'iso-8859-1')
 	#end def
 	
 	def get_conjugation(self, verb, tense):
@@ -394,7 +395,7 @@ class DixOsolaComConjugator(Translator):
 				
 				return conjugations
 			else:
-				print(u'Cannot find conjugations for verb "%s".' % verb)
+				print('Cannot find conjugations for verb "%s".' % verb)
 			#end if
 		#end if
 		
@@ -405,7 +406,7 @@ class DixOsolaComConjugator(Translator):
 class DeWiktionaryOrg(Translator):
 
 	def __init__(self):
-		Translator.__init__(self, u'http://de.wiktionary.org/wiki/%s')
+		Translator.__init__(self, 'http://de.wiktionary.org/wiki/%s')
 	#end def
 
 	def get_translation(self, word):
@@ -442,7 +443,7 @@ class DeWiktionaryOrg(Translator):
 class EnWiktionaryOrg(Translator):
 
 	def __init__(self):
-		Translator.__init__(self, u'http://en.wiktionary.org/wiki/%s')
+		Translator.__init__(self, 'http://en.wiktionary.org/wiki/%s')
 	#end def
 
 	def get_translation(self, word):
@@ -475,8 +476,9 @@ class EnWiktionaryOrg(Translator):
 #end class
 
 class OxfordDictionary(Translator):
+	
 	def __init__(self):
-		Translator.__init__(self, u'http://www.oxforddictionaries.com/definition/english/%s')
+		Translator.__init__(self, 'http://www.oxforddictionaries.com/definition/english/%s')
 	#end def
 
 	def get_info(self, word):
@@ -505,7 +507,7 @@ class DictCc(Translator):
 	MAX_TRANSLATIONS = 5
 	
 	def __init__(self):
-		Translator.__init__(self, u'http://www.dict.cc/?s=%s')
+		Translator.__init__(self, 'http://www.dict.cc/?s=%s')
 	#end def
 	
 	def get_translation(self, word):
@@ -553,4 +555,3 @@ class DictCc(Translator):
 		return { 'normalized' : tmp_word, 'translation' : translation, 'wordtype' : wordtype }
 	#end def
 #end class
-
