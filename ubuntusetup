@@ -27,8 +27,8 @@ function addAptRepositories() {
 	#sudo add-apt-repository ppa:webupd8team/java
 	
 	sudo apt-add-repository ppa:webupd8team/java
-	sudo apt-add-repository ppa:strukturag/libde265 # only required for Ubuntu <= 14.04
 	sudo add-apt-repository ppa:ubuntu-desktop/ubuntu-make
+	sudo add-apt-repository ppa:atareao/atareao 
 	
 	sudo apt-get update
 }
@@ -44,7 +44,7 @@ function installUtils() {
 
 # install different useful tools that are not provided by default
 function installMisc() {
-	sudo apt-get -y remove empathy # remove unused components
+	#sudo apt-get -y remove empathy # remove unused components
 	sudo apt-get -y install inkscape gimp gthumb filezilla pidgin pidgin-otr skype4pidgin vlc
 }
 
@@ -53,7 +53,7 @@ function installDevTools() {
 }
 
 function installGnomeShell() {
-	sudo apt-get -y install gnome-shell gnome-tweak-tool menulibre redshift-gtk
+	sudo apt-get -y install gnome-shell gnome-tweak-tool menulibre redshift-gtk touchpad-indicator
 }
 
 function installLatex() {
@@ -72,6 +72,12 @@ function configureGnomeSettings() {
 	gsettings set org.gnome.gedit.preferences.editor bracket-matching true
 	gsettings set org.gnome.gedit.preferences.editor scheme 'oblivion'
 	gsettings set org.gnome.gedit.preferences.editor auto-indent true
+	
+	#/etc/geoclue/geoclue.conf - fixes issue with redshift
+	#[redshift]
+	#allowed=true
+	#system=false
+	#users=
 }
 
 ## MAIN ##
