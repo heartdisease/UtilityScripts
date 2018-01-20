@@ -15,20 +15,7 @@ VERSION_CODE_NAME=$(lsb_release -sc)
 
 # this function is only used by add_repositories()
 function addAptRepositories() {
-	# PPA for wine
-	#add-apt-repository -y ppa:ubuntu-wine/ppa
-	# PPA for VLC player
-	#add-apt-repository -y ppa:videolan/stable-daily
-	# PPA for Guayadeque media player
-	#add-apt-repository -y ppa:anonbeat/guayadeque
-	# PPA for ffmpeg
-	#add-apt-repository -y ppa:jon-severinsson/ffmpeg
-	# PPA for Oracle Java
-	#sudo add-apt-repository ppa:webupd8team/java
-	
-	sudo apt-add-repository ppa:webupd8team/java
-	sudo add-apt-repository ppa:ubuntu-desktop/ubuntu-make
-	sudo add-apt-repository ppa:atareao/atareao 
+	#sudo add-apt-repository ppa:atareao/atareao 
 	
 	sudo apt-get update
 }
@@ -39,21 +26,26 @@ function installMediaCodecs() {
 }
 
 function installUtils() {
-	sudo apt-get -y install rar p7zip optipng wine ttf-mscorefonts-installer fonts-sil-gentium nautilus-open-terminal nautilus-gtkhash gparted libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans libreoffice-presenter-console libreoffice-presentation-minimizer
+	sudo apt-get -y install rar p7zip pass pwgen nautilus-gtkhash gparted optipng fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
 }
 
 # install different useful tools that are not provided by default
 function installMisc() {
 	#sudo apt-get -y remove empathy # remove unused components
-	sudo apt-get -y install inkscape gimp gthumb filezilla pidgin pidgin-otr skype4pidgin vlc
+	sudo apt-get -y install inkscape gimp gthumb filezilla pidgin pidgin-otr pidgin-skype-common vlc
 }
 
 function installDevTools() {
-	sudo apt-get -y install build-essential ubuntu-make oracle-java8-installer
+	sudo apt-get -y install build-essential
 }
 
 function installGnomeShell() {
 	sudo apt-get -y install gnome-shell gnome-tweak-tool menulibre redshift-gtk touchpad-indicator
+}
+
+function installWine() {
+	#TODO implement
+	#sudo apt-get -y install wine-stable
 }
 
 function installLatex() {
@@ -64,6 +56,7 @@ function installAnthy() {
 	sudo apt-get -y install anthy ibus-anthy language-pack-ja language-pack-ja-base language-pack-gnome-ja-base language-pack-gnome-ja kanjipad
 }
 
+# TODO adapt settings to new format!
 function configureGnomeSettings() {
 	gsettings set org.gnome.nautilus.preferences default-sort-order type # set default file order to 'by type'
 	gsettings set org.gnome.nautilus.preferences executable-text-activation ask # allow scripts to be executed by double-click (dialog)
@@ -72,12 +65,12 @@ function configureGnomeSettings() {
 	gsettings set org.gnome.gedit.preferences.editor bracket-matching true
 	gsettings set org.gnome.gedit.preferences.editor scheme 'oblivion'
 	gsettings set org.gnome.gedit.preferences.editor auto-indent true
-	
-	#/etc/geoclue/geoclue.conf - fixes issue with redshift
-	#[redshift]
-	#allowed=true
-	#system=false
-	#users=
+}
+
+function disableSystemShortcuts() {
+	gsettings set org.gnome.desktop.wm.keybindings toggle-shaded "[]"
+	gsettings set org.gnome.desktop.wm.keybindings begin-move "[]"
+	gsettings set org.gnome.desktop.wm.keybindings panel-main-menu "[]"
 }
 
 ## MAIN ##
@@ -88,13 +81,7 @@ then
 	sudo mkdir -m 744 /usr/share/fonts/truetype/ttf-extra
 fi
 
-# install aptitude if it's not already installed
-if [ ! -f "/usr/bin/aptitude" ]
-then
-	sudo apt-get -y install aptitude
-fi
-
-configureGnomeSettings
+#configureGnomeSettings
 addAptRepositories
 
 installGnomeShell
@@ -102,10 +89,13 @@ installUtils
 installMediaCodecs
 installMisc
 installDevTools
+#installWine
 #installAnthy # install japanese extensions
 #installLatex # install texlive environment
 
-sudo apt-get --force-yes -y dist-upgrade # update packages
+disableSystemShortcuts
+
+sudo apt-get -y upgrade    # update packages
 sudo apt-get -y autoremove # remove unused packages
 
 echo "Ubuntu setup is done."
