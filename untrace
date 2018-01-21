@@ -1,0 +1,40 @@
+#!/bin/bash
+IFS=$'\n'
+now=$(date +%s)
+limit=$[$now-3600*12]
+
+function delete_new() {
+	for file in $(ls "$1")
+	do
+		file="$1/$file"
+		if [ $(stat -c %Y "$file") -gt $limit ]
+		then
+			if [ -z $(echo $file | grep "~$") ] # check if $file is not a backup copy
+			then
+				echo "Delete file '$file'"
+				shred -fuzn 0 "$file"
+				#rm -f "$file"
+			fi
+		fi 
+	done
+}
+
+# remove all bookmarks from gnome apps (the l33t way)
+function delete_history() {
+	rm ~/.local/share/recently-used.xbel
+	mkdir ~/.local/share/recently-used.xbel # create dir with same name, so it cannot be simply recreated
+	totem &
+	pid=$!
+	sleep 1
+	kill $pid
+	rmdir ~/.local/share/recently-used.xbel # remove dir again
+}
+
+delete_history
+
+delete_new ~/.thumbnails/large
+delete_new ~/.thumbnails/normal
+delete_new ~/.cache/thumbnails/large
+delete_new ~/.cache/thumbnails/normal
+
+delete_history
