@@ -17,43 +17,51 @@ VERSION_CODE_NAME=$(lsb_release -sc)
 function addAptRepositories() {
 	#sudo add-apt-repository ppa:atareao/atareao 
 	
-	sudo apt-get update
+	sudo apt update
 }
 
 # install all media codecs for gstreamer + mozilla plugin
 function installMediaCodecs() {
-	sudo apt-get -y install ubuntu-restricted-extras
+	sudo apt install -y ubuntu-restricted-extras
 }
 
 function installUtils() {
-	sudo apt-get -y install rar p7zip pass pwgen nautilus-gtkhash gparted optipng fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
+	sudo apt install -y rar p7zip pass pwgen nautilus-gtkhash gparted optipng fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
 }
 
 # install different useful tools that are not provided by default
 function installMisc() {
-	#sudo apt-get -y remove empathy # remove unused components
-	sudo apt-get -y install inkscape gimp gthumb filezilla pidgin pidgin-otr pidgin-skype-common vlc
+	sudo apt install -y inkscape gimp gthumb filezilla pidgin pidgin-otr pidgin-skype-common vlc
 }
 
 function installDevTools() {
-	sudo apt-get -y install build-essential
+	sudo apt install -y build-essential
 }
 
 function installGnomeShell() {
-	sudo apt-get -y install gnome-shell gnome-tweak-tool menulibre redshift-gtk touchpad-indicator
+	sudo apt install -y gnome-shell gnome-tweak-tool menulibre touchpad-indicator
+}
+
+function installRedshift() {
+	sudo apt install -y redshift-gtk
+	#TODO add this to /etc/geoclue/geoclue.conf
+	#[redshift]
+	#allowed=true
+	#system=false
+	#users=
 }
 
 function installWine() {
 	#TODO implement
-	#sudo apt-get -y install wine-stable
+	#sudo apt install -y wine-stable
 }
 
 function installLatex() {
-	sudo apt-get -y install libreoffice-writer2latex texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-extra-utils
+	sudo apt install -y libreoffice-writer2latex texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-extra-utils
 }
 
 function installAnthy() {
-	sudo apt-get -y install anthy ibus-anthy language-pack-ja language-pack-ja-base language-pack-gnome-ja-base language-pack-gnome-ja kanjipad
+	sudo apt install -y anthy ibus-anthy language-pack-ja language-pack-ja-base language-pack-gnome-ja-base language-pack-gnome-ja kanjipad
 }
 
 # TODO adapt settings to new format!
@@ -85,6 +93,7 @@ fi
 addAptRepositories
 
 installGnomeShell
+installRedshift
 installUtils
 installMediaCodecs
 installMisc
@@ -95,8 +104,8 @@ installDevTools
 
 disableSystemShortcuts
 
-sudo apt-get -y upgrade    # update packages
-sudo apt-get -y autoremove # remove unused packages
+sudo apt upgrade -y    # update packages
+sudo apt autoremove -y # remove unused packages
 
 echo "Ubuntu setup is done."
 
