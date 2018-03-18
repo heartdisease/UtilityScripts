@@ -15,8 +15,8 @@ VERSION_CODE_NAME=$(lsb_release -sc)
 
 # this function is only used by add_repositories()
 function addAptRepositories() {
-	#sudo add-apt-repository ppa:atareao/atareao 
-	
+	#sudo add-apt-repository ppa:atareao/atareao
+	sudo add-apt-repository ppa:webupd8team/java
 	sudo apt update
 }
 
@@ -35,7 +35,7 @@ function installMisc() {
 }
 
 function installDevTools() {
-	sudo apt install -y build-essential
+	sudo apt install -y build-essential oracle-java9-installer
 }
 
 function installGnomeShell() {
