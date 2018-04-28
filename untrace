@@ -19,13 +19,13 @@ function delete_new() {
 	done
 }
 
-# remove all bookmarks from gnome apps (the l33t way)
+# remove all bookmarks from gnome apps (the 1337 way)
 function delete_history() {
 	rm ~/.local/share/recently-used.xbel
 	mkdir ~/.local/share/recently-used.xbel # create dir with same name, so it cannot be simply recreated
 	totem &
 	pid=$!
-	sleep 1
+	sleep 2
 	kill $pid
 	rmdir ~/.local/share/recently-used.xbel # remove dir again
 }
