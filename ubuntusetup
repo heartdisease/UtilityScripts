@@ -26,7 +26,7 @@ function installMediaCodecs() {
 }
 
 function installUtils() {
-	sudo apt install -y rar p7zip pass pwgen nautilus-gtkhash gparted optipng fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
+	sudo apt install -y rar p7zip keepass2 pwgen nautilus-gtkhash gparted optipng fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
 }
 
 # install different useful tools that are not provided by default
@@ -35,11 +35,11 @@ function installMisc() {
 }
 
 function installDevTools() {
-	sudo apt install -y build-essential oracle-java9-installer
+	sudo apt install -y build-essential oracle-java8-installer
 }
 
 function installGnomeShell() {
-	sudo apt install -y gnome-shell gnome-tweak-tool menulibre touchpad-indicator
+	sudo apt install -y gnome-shell gnome-session gnome-tweak-tool menulibre touchpad-indicator
 }
 
 function installRedshift() {
@@ -51,10 +51,10 @@ function installRedshift() {
 	#users=
 }
 
-function installWine() {
+#function installWine() {
 	#TODO implement
 	#sudo apt install -y wine-stable
-}
+#}
 
 function installLatex() {
 	sudo apt install -y libreoffice-writer2latex texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-extra-utils
@@ -90,7 +90,7 @@ then
 fi
 
 #configureGnomeSettings
-addAptRepositories
+#addAptRepositories
 
 installGnomeShell
 installRedshift
@@ -102,7 +102,7 @@ installDevTools
 #installAnthy # install japanese extensions
 #installLatex # install texlive environment
 
-disableSystemShortcuts
+#disableSystemShortcuts
 
 sudo apt upgrade -y    # update packages
 sudo apt autoremove -y # remove unused packages
