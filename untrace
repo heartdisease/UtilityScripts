@@ -25,16 +25,14 @@ function delete_history() {
 	mkdir ~/.local/share/recently-used.xbel # create dir with same name, so it cannot be simply recreated
 	totem &
 	pid=$!
-	sleep 2
+	sleep $1
 	kill $pid
 	rmdir ~/.local/share/recently-used.xbel # remove dir again
 }
 
-delete_history
+delete_history 3
 
-delete_new ~/.thumbnails/large
-delete_new ~/.thumbnails/normal
 delete_new ~/.cache/thumbnails/large
 delete_new ~/.cache/thumbnails/normal
 
-delete_history
+delete_history 1
