@@ -15,6 +15,12 @@ VERSION_CODE_NAME=$(lsb_release -sc)
 
 # this function is only used by add_repositories()
 function addAptRepositories() {
+	sudo apt install curl
+
+	curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
+	sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
+	sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
+
 	#sudo add-apt-repository ppa:atareao/atareao
 	sudo add-apt-repository ppa:webupd8team/java
 	sudo apt update
@@ -26,7 +32,7 @@ function installMediaCodecs() {
 }
 
 function installUtils() {
-	sudo apt install -y rar p7zip keepass2 pwgen nautilus-gtkhash gparted optipng fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
+	sudo apt install -y net-tools curl rar p7zip keepass2 pwgen nautilus-gtkhash gparted optipng fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
 }
 
 # install different useful tools that are not provided by default
@@ -35,7 +41,7 @@ function installMisc() {
 }
 
 function installDevTools() {
-	sudo apt install -y build-essential oracle-java8-installer
+	sudo apt install -y build-essential oracle-java8-installer code npm
 }
 
 function installGnomeShell() {
@@ -43,12 +49,14 @@ function installGnomeShell() {
 }
 
 function installRedshift() {
+	geoclue_conf="/etc/geoclue/geoclue.conf"
 	sudo apt install -y redshift-gtk
-	#TODO add this to /etc/geoclue/geoclue.conf
-	#[redshift]
-	#allowed=true
-	#system=false
-	#users=
+
+	sudo sh -c "echo >> $geoclue_conf"
+	sudo sh -c "echo '[redshift]' >> $geoclue_conf"
+	sudo sh -c "echo 'allowed=true' >> $geoclue_conf"
+	sudo sh -c "echo 'system=false' >> $geoclue_conf"
+	sudo sh -c "echo 'users=' >> $geoclue_conf"
 }
 
 #function installWine() {

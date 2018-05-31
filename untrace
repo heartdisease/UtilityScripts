@@ -30,7 +30,7 @@ function delete_history() {
 	rmdir ~/.local/share/recently-used.xbel # remove dir again
 }
 
-delete_history 3
+delete_history 4
 
 delete_new ~/.cache/thumbnails/large
 delete_new ~/.cache/thumbnails/normal
