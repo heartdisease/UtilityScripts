@@ -13,21 +13,29 @@ fi
 
 VERSION_CODE_NAME=$(lsb_release -sc)
 
-# this function is only used by add_repositories()
 function addAptRepositories() {
-	sudo apt install curl
+	sudo apt install -y curl
 
+	# install repo for VSCode
 	curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
 	sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
 	sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
 
-	#sudo add-apt-repository ppa:atareao/atareao
+	# install repo for Node.js
+	curl -sL https://deb.nodesource.com/setup_10.x | sudo -E bash -
+
+	# install repo for Yarn package manager
+	#curl -sL https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+	#echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+
+	# install repo for Oracle JDK 8
 	sudo add-apt-repository ppa:webupd8team/java
+
 	sudo apt update
 }
 
-# install all media codecs for gstreamer + mozilla plugin
 function installMediaCodecs() {
+	# installs all media codecs for gstreamer + mozilla plugin
 	sudo apt install -y ubuntu-restricted-extras
 }
 
@@ -41,11 +49,14 @@ function installMisc() {
 }
 
 function installDevTools() {
-	sudo apt install -y build-essential oracle-java8-installer code npm
+	sudo apt install -y build-essential oracle-java8-installer code nodejs git
+	sudo npm install -g @angular/cli
 }
 
 function installGnomeShell() {
-	sudo apt install -y gnome-shell gnome-session gnome-tweak-tool menulibre touchpad-indicator
+	sudo apt install -y gnome-shell gnome-session gnome-tweak-tool menulibre # outdated: touchpad-indicator
+	echo "--> Manually select '/usr/share/gnome-shell/theme/gnome-shell.css':"
+	sudo update-alternatives --config gdm3.css
 }
 
 function installRedshift() {
@@ -57,6 +68,11 @@ function installRedshift() {
 	sudo sh -c "echo 'allowed=true' >> $geoclue_conf"
 	sudo sh -c "echo 'system=false' >> $geoclue_conf"
 	sudo sh -c "echo 'users=' >> $geoclue_conf"
+}
+
+function installLaptopModeTools() {
+	sudo apt install -y tlp tlp-rdw
+	# start with: sudo tlp start
 }
 
 #function installWine() {
@@ -72,8 +88,9 @@ function installAnthy() {
 	sudo apt install -y anthy ibus-anthy language-pack-ja language-pack-ja-base language-pack-gnome-ja-base language-pack-gnome-ja kanjipad
 }
 
-# TODO adapt settings to new format!
 function configureGnomeSettings() {
+	# TODO adapt settings to new format!
+
 	gsettings set org.gnome.nautilus.preferences default-sort-order type # set default file order to 'by type'
 	gsettings set org.gnome.nautilus.preferences executable-text-activation ask # allow scripts to be executed by double-click (dialog)
 	gsettings set org.gnome.gedit.preferences.editor display-line-numbers true # display line numbers in gedit
@@ -89,30 +106,34 @@ function disableSystemShortcuts() {
 	gsettings set org.gnome.desktop.wm.keybindings panel-main-menu "[]"
 }
 
+function createCustomFontDirectory() {
+	# create font directory for user defined truetype fonts
+	if [ ! -d "/usr/share/fonts/truetype/ttf-extra" ]
+	then
+		sudo mkdir -m 744 /usr/share/fonts/truetype/ttf-extra
+	fi
+}
+
 ## MAIN ##
 
-# create font directory for user defined truetype fonts
-if [ ! -d "/usr/share/fonts/truetype/ttf-extra" ]
-then
-	sudo mkdir -m 744 /usr/share/fonts/truetype/ttf-extra
-fi
+sudo apt update
 
+#createCustomFontDirectory
 #configureGnomeSettings
+#disableSystemShortcuts
 #addAptRepositories
 
 installGnomeShell
-installRedshift
+#installRedshift
+installLaptopModeTools
 installUtils
 installMediaCodecs
 installMisc
-installDevTools
-#installWine
+#installDevTools
 #installAnthy # install japanese extensions
 #installLatex # install texlive environment
 
-#disableSystemShortcuts
-
-sudo apt upgrade -y    # update packages
+sudo apt update && sudo apt upgrade -y # update all install packages
 sudo apt autoremove -y # remove unused packages
 
 echo "Ubuntu setup is done."
