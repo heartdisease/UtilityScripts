@@ -45,11 +45,11 @@ function installUtils() {
 
 # install different useful tools that are not provided by default
 function installMisc() {
-	sudo apt install -y inkscape gimp gthumb filezilla pidgin pidgin-otr pidgin-skype-common vlc
+	sudo apt install -y inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc thunderbird thunderbird-gnome-support
 }
 
 function installDevTools() {
-	sudo apt install -y build-essential oracle-java8-installer code nodejs git
+	sudo apt install -y build-essential oracle-java8-installer nodejs git code
 	sudo npm install -g @angular/cli
 }
 
@@ -89,21 +89,21 @@ function installAnthy() {
 }
 
 function configureGnomeSettings() {
-	# TODO adapt settings to new format!
+	gsettings set org.gnome.nautilus.preferences default-sort-order 'type'
+	gsettings set org.gnome.nautilus.preferences executable-text-activation 'ask'
 
-	gsettings set org.gnome.nautilus.preferences default-sort-order type # set default file order to 'by type'
-	gsettings set org.gnome.nautilus.preferences executable-text-activation ask # allow scripts to be executed by double-click (dialog)
-	gsettings set org.gnome.gedit.preferences.editor display-line-numbers true # display line numbers in gedit
+	gsettings set org.gnome.gedit.preferences.editor display-line-numbers true
 	gsettings set org.gnome.gedit.preferences.editor highlight-current-line true
 	gsettings set org.gnome.gedit.preferences.editor bracket-matching true
 	gsettings set org.gnome.gedit.preferences.editor scheme 'oblivion'
 	gsettings set org.gnome.gedit.preferences.editor auto-indent true
+	gsettings set org.gnome.gedit.preferences.editor tabs-size 'uint32 2'
 }
 
 function disableSystemShortcuts() {
-	gsettings set org.gnome.desktop.wm.keybindings toggle-shaded "[]"
-	gsettings set org.gnome.desktop.wm.keybindings begin-move "[]"
-	gsettings set org.gnome.desktop.wm.keybindings panel-main-menu "[]"
+	gsettings set org.gnome.desktop.wm.keybindings toggle-shaded '[]'
+	gsettings set org.gnome.desktop.wm.keybindings begin-move '[]'
+	gsettings set org.gnome.desktop.wm.keybindings panel-main-menu '[]'
 }
 
 function createCustomFontDirectory() {
@@ -118,9 +118,6 @@ function createCustomFontDirectory() {
 
 sudo apt update
 
-#createCustomFontDirectory
-#configureGnomeSettings
-#disableSystemShortcuts
 #addAptRepositories
 
 installGnomeShell
@@ -132,6 +129,10 @@ installMisc
 #installDevTools
 #installAnthy # install japanese extensions
 #installLatex # install texlive environment
+
+#createCustomFontDirectory
+configureGnomeSettings
+disableSystemShortcuts
 
 sudo apt update && sudo apt upgrade -y # update all install packages
 sudo apt autoremove -y # remove unused packages
