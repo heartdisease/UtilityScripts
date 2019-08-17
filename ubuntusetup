@@ -14,7 +14,10 @@ fi
 VERSION_CODE_NAME=$(lsb_release -sc)
 
 function addAptRepositories() {
-	sudo apt install -y curl
+	if [ ! -f "/usr/bin/curl" ]
+	then
+		sudo apt install -y curl
+	fi
 
 	# install repo for VSCode
 	curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
@@ -22,14 +25,7 @@ function addAptRepositories() {
 	sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
 
 	# install repo for Node.js
-	curl -sL https://deb.nodesource.com/setup_10.x | sudo -E bash -
-
-	# install repo for Yarn package manager
-	#curl -sL https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-	#echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-
-	# install repo for Oracle JDK 8
-	sudo add-apt-repository ppa:webupd8team/java
+	curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
 
 	sudo apt update
 }
@@ -40,21 +36,21 @@ function installMediaCodecs() {
 }
 
 function installUtils() {
-	sudo apt install -y net-tools curl rar p7zip keepass2 pwgen nautilus-gtkhash gparted optipng fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
+	sudo apt install -y net-tools curl rar p7zip-full keepass2 pwgen nautilus-gtkhash gparted optipng fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
 }
 
 # install different useful tools that are not provided by default
 function installMisc() {
-	sudo apt install -y inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc thunderbird thunderbird-gnome-support
+	sudo apt install -y inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc thunderbird thunderbird-gnome-support transmission-gtk
 }
 
 function installDevTools() {
-	sudo apt install -y build-essential oracle-java8-installer nodejs git code
+	sudo apt install -y build-essential openjdk-11-jdk nodejs git code
 	sudo npm install -g @angular/cli
 }
 
 function installGnomeShell() {
-	sudo apt install -y gnome-shell gnome-session gnome-tweak-tool menulibre # outdated: touchpad-indicator
+	sudo apt install -y gnome-shell gnome-session gnome-tweak-tool menulibre
 	echo "--> Manually select '/usr/share/gnome-shell/theme/gnome-shell.css':"
 	sudo update-alternatives --config gdm3.css
 }
@@ -117,22 +113,21 @@ function createCustomFontDirectory() {
 ## MAIN ##
 
 sudo apt update
-
 #addAptRepositories
 
-installGnomeShell
+#installGnomeShell
 #installRedshift
-installLaptopModeTools
-installUtils
-installMediaCodecs
-installMisc
+#installLaptopModeTools
+#installUtils
+#installMediaCodecs
+#installMisc
 #installDevTools
 #installAnthy # install japanese extensions
 #installLatex # install texlive environment
 
 #createCustomFontDirectory
-configureGnomeSettings
-disableSystemShortcuts
+#configureGnomeSettings
+#disableSystemShortcuts
 
 sudo apt update && sudo apt upgrade -y # update all install packages
 sudo apt autoremove -y # remove unused packages
