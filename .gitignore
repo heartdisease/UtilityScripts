@@ -5,3 +5,7 @@
 *.jpeg
 *.gif
 *.svg
+
+wlan-pw.txt
+wordanalyzer/output.csv
+wordanalyzer/__pycache__
