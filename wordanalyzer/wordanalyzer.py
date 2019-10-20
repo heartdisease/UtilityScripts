@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
+import codecs
 import re
 import sys
-import codecs
 
-from utils import CsvReader, ThreadPool, Processable
-from arguments import CommandLineParser
-from translators import Translator, SpanishdictCom, DixOsolaComDe, DixOsolaComEn, SpanishDictConjugator, DixOsolaComConjugator, DeWiktionaryOrg, EnWiktionaryOrg, OxfordDictionary, DictCc
-
-import wordlist_es
 import wordlist_en
+import wordlist_es
+from arguments import CommandLineParser
+from translators import Translator, SpanishdictCom, DixOsolaComDe, DixOsolaComConjugator, DeWiktionaryOrg, OxfordDictionary, DictCc
+from utils import CsvReader, ThreadPool, Processable
+
 
 ### TODO fix verb conjugation bug (yo is always last column)
 
-class SpanishWordAnalyzer(object):
+class SpanishWordAnalyzer:
 
 	SPANISH_TO_GERMAN = [ # any occurance of the letter x will not be replaced due to the unpredictability of its pronounciation (h and y need special treatment)
 		('ch', 'tsch'), ('cc', 'ks'), ('j', 'ch'), ('ñ', 'nj'), ('ll', 'j'), ('v', 'b'), ('z', 's'),
@@ -26,9 +26,7 @@ class SpanishWordAnalyzer(object):
 		('ei', 'e·i'), ('éi', 'é·i'), ('eí', 'e·í'),
 		('ie', 'i·e'), ('íe', 'í·e'), ('ié', 'i·é')
 	]
-	ACCENT_CONVERSION = {
-		'a' : 'á', 'e' : 'é', 'i' : 'í', 'o' : 'ó', '' : 'ú'
-	}
+	ACCENT_CONVERSION = {'a' : 'á', 'e' : 'é', 'i' : 'í', 'o' : 'ó', '' : 'ú'}
 
 	def __init__(self, word):
 		self._word = word
@@ -172,7 +170,7 @@ class SpanishWordAnalyzer(object):
 	#end def
 #end class
 
-class Wordanalyzer(object):
+class Wordanalyzer:
 	"""Main class."""
 	CSV_SEPARATOR = ','
 	TEXT_DELIMITER = '"'
@@ -190,9 +188,7 @@ class Wordanalyzer(object):
 		('ei', 'e·i'), ('éi', 'é·i'), ('eí', 'e·í'),
 		('ie', 'i·e'), ('íe', 'í·e'), ('ié', 'i·é')
 	]
-	ACCENT_CONVERSION = {
-		'a' : 'á', 'e' : 'é', 'i' : 'í', 'o' : 'ó', '' : 'ú'
-	}
+	ACCENT_CONVERSION = {'a' : 'á', 'e' : 'é', 'i' : 'í', 'o' : 'ó', '' : 'ú'}
 	
 	@staticmethod
 	def get_translation_es(word):
