@@ -36,7 +36,7 @@ function installMediaCodecs() {
 }
 
 function installUtils() {
-	sudo apt install -y net-tools curl rar p7zip-full keepass2 pwgen nautilus-gtkhash gparted optipng fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
+	sudo apt install -y net-tools curl rar p7zip-full optipng pwgen keepass2 nautilus-gtkhash gparted usb-creator-gtk fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
 }
 
 # install different useful tools that are not provided by default
