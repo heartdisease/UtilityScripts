@@ -63,19 +63,6 @@ function installGnomeShell() {
 	sudo update-alternatives --config gdm3.css
 }
 
-function installRedshift() {
-  # TODO delete function as Redshift is no longer required on Ubuntu
-	geoclue_conf="/etc/geoclue/geoclue.conf"
-
-	sudo apt install -y redshift-gtk
-
-	sudo sh -c "echo >> $geoclue_conf"
-	sudo sh -c "echo '[redshift]' >> $geoclue_conf"
-	sudo sh -c "echo 'allowed=true' >> $geoclue_conf"
-	sudo sh -c "echo 'system=false' >> $geoclue_conf"
-	sudo sh -c "echo 'users=' >> $geoclue_conf"
-}
-
 function installLaptopModeTools() {
 	echo "[UBUNTU SETUP] Installing laptop mode tools..."
 	sudo apt install -y tlp tlp-rdw
@@ -134,7 +121,6 @@ echo "[UBUNTU SETUP] Starting Ubuntu setup..."
 sudo apt update
 
 #installGnomeShell
-#installRedshift
 #installLaptopModeTools
 #installLibreOfficeAddons
 #installUtils
