@@ -1,62 +1,72 @@
 #!/bin/bash
+
+#VERSION_CODE_NAME=$(lsb_release -sc)
+
 if [ "$(lsb_release -si)" != "Ubuntu" ]
 then
-	echo "Your operating system is not supported! Abort."
+	echo "[UBUNTU SETUP] Your operating system is not supported! Abort."
 	exit 1
 fi
 
 if [ "$USERNAME" == "root" ]
 then
-	echo "Please do not execute this script as root! Abort."
+	echo "[UBUNTU SETUP] Please do not execute this script as root! Abort."
 	exit 1
 fi
-
-VERSION_CODE_NAME=$(lsb_release -sc)
 
 function addAptRepositories() {
 	if [ ! -f "/usr/bin/curl" ]
 	then
+	  echo "[UBUNTU SETUP] Could not find command 'curl'. Installing curl..."
 		sudo apt install -y curl
 	fi
 
-	# install repo for VSCode
+	echo "[UBUNTU SETUP] Configuring repo for VSCode..."
 	curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
 	sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
 	sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
 
-	# install repo for Node.js
+	echo "[UBUNTU SETUP] Configuring repo for Node.js..."
 	curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
-
-	sudo apt update
 }
 
 function installMediaCodecs() {
-	# installs all media codecs for gstreamer + mozilla plugin
+	echo "[UBUNTU SETUP] Installing media codecs..."
 	sudo apt install -y ubuntu-restricted-extras
 }
 
-function installUtils() {
-	sudo apt install -y net-tools curl rar p7zip-full optipng pwgen keepass2 nautilus-gtkhash gparted usb-creator-gtk fonts-sil-gentium libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans
+function installLibreOfficeAddons() {
+	echo "[UBUNTU SETUP] Installing LibreOffice add-ons..."
+	sudo apt install -y libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans libreoffice-writer2latex
 }
 
-# install different useful tools that are not provided by default
+function installUtils() {
+	echo "[UBUNTU SETUP] Installing command-line utilities..."
+	sudo apt install -y fortune-mod fortunes net-tools curl rar p7zip-full optipng pwgen
+}
+
 function installMisc() {
-	sudo apt install -y inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc thunderbird thunderbird-gnome-support transmission-gtk
+	echo "[UBUNTU SETUP] Installing various different useful tools that are not available by default..."
+	sudo apt install -y inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc thunderbird thunderbird-gnome-support transmission-gtk keepass2 nautilus-gtkhash gparted usb-creator-gtk fonts-sil-gentium
 }
 
 function installDevTools() {
+	echo "[UBUNTU SETUP] Installing essential dev-tools..."
 	sudo apt install -y build-essential openjdk-11-jdk nodejs git code
 	sudo npm install -g @angular/cli
 }
 
 function installGnomeShell() {
+	echo "[UBUNTU SETUP] Installing gnome-shell and related utilities..."
 	sudo apt install -y gnome-shell gnome-session gnome-tweak-tool menulibre
-	echo "--> Manually select '/usr/share/gnome-shell/theme/gnome-shell.css':"
+	echo "[HINT] --> Manually select '/usr/share/gnome-shell/theme/gnome-shell.css':"
 	sudo update-alternatives --config gdm3.css
 }
 
 function installRedshift() {
+  # TODO delete function as Redshift is no longer required on Ubuntu
 	geoclue_conf="/etc/geoclue/geoclue.conf"
+
 	sudo apt install -y redshift-gtk
 
 	sudo sh -c "echo >> $geoclue_conf"
@@ -67,24 +77,24 @@ function installRedshift() {
 }
 
 function installLaptopModeTools() {
+	echo "[UBUNTU SETUP] Installing laptop mode tools..."
 	sudo apt install -y tlp tlp-rdw
 	# start with: sudo tlp start
 }
 
-#function installWine() {
-	#TODO implement
-	#sudo apt install -y wine-stable
-#}
-
 function installLatex() {
-	sudo apt install -y libreoffice-writer2latex texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-extra-utils
+	echo "[UBUNTU SETUP] Installing LaTeX distribution 'texlive'..."
+	sudo apt install -y texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-extra-utils
 }
 
 function installAnthy() {
+	echo "[UBUNTU SETUP] Installing Anthy for Japanese language input..."
 	sudo apt install -y anthy ibus-anthy language-pack-ja language-pack-ja-base language-pack-gnome-ja-base language-pack-gnome-ja kanjipad
 }
 
 function configureGnomeSettings() {
+	echo "[UBUNTU SETUP] Configuring GNOME user settings..."
+
 	gsettings set org.gnome.nautilus.preferences default-sort-order 'type'
 	gsettings set org.gnome.nautilus.preferences executable-text-activation 'ask'
 
@@ -97,33 +107,42 @@ function configureGnomeSettings() {
 }
 
 function disableSystemShortcuts() {
-	gsettings set org.gnome.desktop.wm.keybindings toggle-shaded '[]'
+	echo "[UBUNTU SETUP] Disabling GNOME default shortcuts that interfere with IDEs..."
+
+  gsettings set org.gnome.desktop.wm.keybindings toggle-shaded '[]'
 	gsettings set org.gnome.desktop.wm.keybindings begin-move '[]'
 	gsettings set org.gnome.desktop.wm.keybindings panel-main-menu '[]'
 }
 
 function createCustomFontDirectory() {
-	# create font directory for user defined truetype fonts
-	if [ ! -d "/usr/share/fonts/truetype/ttf-extra" ]
+	ttf_extra="/usr/share/fonts/truetype/ttf-extra"
+
+	if [ ! -d "$ttf_extra" ]
 	then
-		sudo mkdir -m 744 /usr/share/fonts/truetype/ttf-extra
+	  echo "[UBUNTU SETUP] Creating font directory '$ttf_extra' for user defined TrueType fonts..."
+		sudo mkdir -m 744 "$ttf_extra"
+	else
+	  echo "[UBUNTU SETUP] Custom font directory '$ttf_extra' already exists. Nothing to do."
 	fi
 }
 
 ## MAIN ##
 
-sudo apt update
+echo "[UBUNTU SETUP] Starting Ubuntu setup..."
+
 #addAptRepositories
+sudo apt update
 
 #installGnomeShell
 #installRedshift
 #installLaptopModeTools
+#installLibreOfficeAddons
 #installUtils
 #installMediaCodecs
 #installMisc
 #installDevTools
-#installAnthy # install japanese extensions
-#installLatex # install texlive environment
+#installAnthy
+#installLatex
 
 #createCustomFontDirectory
 #configureGnomeSettings
@@ -132,5 +151,6 @@ sudo apt update
 sudo apt update && sudo apt upgrade -y # update all install packages
 sudo apt autoremove -y # remove unused packages
 
-echo "Ubuntu setup is done."
+echo "[UBUNTU SETUP] Ubuntu setup is done."
+exit 0
 
