@@ -1,0 +1,157 @@
+#!/bin/bash
+if [ "$(lsb_release -si)" != "ManjaroLinux" ]
+then
+  echo "[MANJARO SETUP] Your operating system is not supported! Abort."
+  exit 1
+fi
+
+if [ "$USERNAME" == "root" ]
+then
+  echo "[MANJARO SETUP] Please do not execute this script as root! Abort."
+  exit 1
+fi
+
+function addRepositories() {
+  if [ ! -f "/usr/bin/curl" ]
+  then
+    echo "[MANJARO SETUP] Could not find command 'curl'. Installing curl..."
+    sudo pacman -Sy curl
+  fi
+
+  #echo "[MANJARO SETUP] Configuring repo for VSCode..."
+  #curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
+  #sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
+  #sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
+
+  #echo "[MANJARO SETUP] Configuring repo for Node.js..."
+  #curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
+}
+
+function installMediaCodecs() {
+  echo "[MANJARO SETUP] Installing media codecs..."
+  #sudo apt install -y ubuntu-restricted-extras
+}
+
+function installLibreOfficeAddons() {
+  echo "[MANJARO SETUP] Installing LibreOffice add-ons..."
+  #sudo apt install -y libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans libreoffice-writer2latex
+}
+
+function installUtils() {
+  echo "[MANJARO SETUP] Installing command-line utilities..."
+  #sudo apt install -y fortune-mod fortunes net-tools curl rar p7zip-full optipng pdftk pwgen
+}
+
+function installMisc() {
+  echo "[MANJARO SETUP] Installing various different useful tools that are not available by default..."
+  #sudo apt install -y inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc thunderbird thunderbird-gnome-support transmission-gtk keepass2 nautilus-gtkhash gparted usb-creator-gtk fonts-sil-gentium
+  sudo pacman -Sy xdotool xsel keepass bcprov pdftk viewnior
+}
+
+function installDevTools() {
+  echo "[MANJARO SETUP] Installing essential dev-tools..."
+  sudo pacman -Sy jre11-openjdk-headless base-devel nodejs-lts-erbium npm git code
+  sudo npm config set ignore-scripts true
+  sudo npm install -g @angular/cli
+}
+
+function installGnomeShell() {
+  echo "[MANJARO SETUP] Installing gnome-shell and related utilities..."
+  sudo pacman -Sy gnome-shell gnome-session gnome-tweak-tool menulibre
+  echo "[HINT] --> Manually select '/usr/share/gnome-shell/theme/gnome-shell.css':"
+  sudo update-alternatives --config gdm3.css
+}
+
+function installLaptopModeTools() {
+  echo "[MANJARO SETUP] Installing laptop mode tools..."
+  #sudo apt install -y tlp tlp-rdw
+  # start with: sudo tlp start
+}
+
+function installLatex() {
+  echo "[MANJARO SETUP] Installing LaTeX distribution 'texlive'..."
+  #sudo apt install -y texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-extra-utils
+}
+
+function installAnthy() {
+  echo "[MANJARO SETUP] Installing Anthy for Japanese language input..."
+  #sudo apt install -y anthy ibus-anthy language-pack-ja language-pack-ja-base language-pack-gnome-ja-base language-pack-gnome-ja kanjipad
+}
+
+function configureGnomeSettings() {
+  echo "[MANJARO SETUP] Configuring GNOME user settings..."
+
+  gsettings set org.gnome.nautilus.preferences default-sort-order 'type'
+  gsettings set org.gnome.nautilus.preferences executable-text-activation 'ask'
+
+  gsettings set org.gnome.gedit.preferences.editor display-line-numbers true
+  gsettings set org.gnome.gedit.preferences.editor highlight-current-line true
+  gsettings set org.gnome.gedit.preferences.editor bracket-matching true
+  gsettings set org.gnome.gedit.preferences.editor scheme 'oblivion'
+  gsettings set org.gnome.gedit.preferences.editor auto-indent true
+  gsettings set org.gnome.gedit.preferences.editor tabs-size 'uint32 2'
+}
+
+function disableSystemShortcuts() {
+  echo "[MANJARO SETUP] Disabling GNOME default shortcuts that interfere with IDEs..."
+
+  gsettings set org.gnome.desktop.wm.keybindings toggle-shaded '[]'
+  gsettings set org.gnome.desktop.wm.keybindings begin-move '[]'
+  gsettings set org.gnome.desktop.wm.keybindings panel-main-menu '[]'
+}
+
+function createCustomFontDirectory() {
+  ttf_extra="/usr/share/fonts/truetype/ttf-extra"
+
+  if [ ! -d "$ttf_extra" ]
+  then
+    echo "[MANJARO SETUP] Creating font directory '$ttf_extra' for user defined TrueType fonts..."
+    sudo mkdir -m 744 "$ttf_extra"
+  else
+    echo "[MANJARO SETUP] Custom font directory '$ttf_extra' already exists. Nothing to do."
+  fi
+}
+
+function optimizeMirrors() {
+  # found at https://itsfoss.com/install-remove-software-manjaro/
+  sudo pacman-mirrors -g
+  sudo pacman -Syy
+}
+
+function installGraphicsDrivers() {
+  # found at https://itsfoss.com/install-remove-software-manjaro/
+  sudo mhwd -i pci video-nvidia-440xx
+  sudo nvidia-settings
+}
+
+## MAIN ##
+
+echo "[MANJARO SETUP] Starting Manjaro setup..."
+
+optimizeMirrors
+
+#addAptRepositories
+
+#sudo pacman -Sy manjaro-xfce-settings
+
+installGraphicsDrivers
+
+#installGnomeShell
+#installLaptopModeTools
+#installLibreOfficeAddons
+installUtils
+#installMediaCodecs
+installMisc
+#installDevTools
+#installAnthy
+#installLatex
+
+#createCustomFontDirectory
+configureGnomeSettings
+#disableSystemShortcuts
+
+#sudo apt update && sudo apt upgrade -y # update all install packages
+#sudo apt autoremove -y # remove unused packages
+
+echo "[MANJARO SETUP] Manjaro setup is complete."
+exit 0
