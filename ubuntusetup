@@ -42,7 +42,7 @@ function installLibreOfficeAddons() {
 
 function installUtils() {
 	echo "[UBUNTU SETUP] Installing command-line utilities..."
-	sudo apt install -y fortune-mod fortunes net-tools curl rar p7zip-full optipng pwgen
+	sudo apt install -y fortune-mod fortunes net-tools curl rar p7zip-full optipng pdftk pwgen
 }
 
 function installMisc() {
@@ -52,7 +52,7 @@ function installMisc() {
 
 function installDevTools() {
 	echo "[UBUNTU SETUP] Installing essential dev-tools..."
-	sudo apt install -y build-essential openjdk-11-jdk nodejs git code
+	sudo apt install -y build-essential openjdk-11-jdk nodejs npm git code
 	sudo npm install -g @angular/cli
 }
 
@@ -123,10 +123,10 @@ sudo apt update
 #installGnomeShell
 #installLaptopModeTools
 #installLibreOfficeAddons
-#installUtils
+installUtils
 #installMediaCodecs
-#installMisc
-#installDevTools
+installMisc
+installDevTools
 #installAnthy
 #installLatex
 

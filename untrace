@@ -12,10 +12,10 @@ function delete_new() {
 			if [ -z $(echo $file | grep "~$") ] # check if $file is not a backup copy
 			then
 				echo "Delete file '$file'"
-				shred -fuzn 0 "$file"
-				#rm -f "$file"
+				#shred -fuzn 0 "$file"
+				rm -f "$file"
 			fi
-		fi 
+		fi
 	done
 }
 
