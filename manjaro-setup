@@ -29,7 +29,7 @@ function installUtils() {
 function installMisc() {
   echo "[MANJARO SETUP] Installing various different useful tools that are not available by default..."
   # nautilus-gtkhash usb-creator-gtk thunderbird-gnome-support
-  sudo pacman -Sy thunderbird  inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc transmission-gtk gparted xdotool xsel keepass bcprov pdftk viewnior
+  sudo pacman -Sy thunderbird veracrypt inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc transmission-gtk gparted xdotool xsel keepass bcprov pdftk viewnior
 }
 
 function installDevTools() {
@@ -121,7 +121,7 @@ echo "[MANJARO SETUP] Starting Manjaro setup..."
 #installUtils
 #installMediaCodecs
 installMisc
-#installDevTools
+installDevTools
 #installAnthy
 #installLatex
 
