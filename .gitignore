@@ -1,11 +1,15 @@
 .*
 *~
+
+!.gitignore
+
 *.png
 *.jpg
 *.jpeg
 *.gif
 *.svg
 
+fstab*
 wlan-pw.txt
 wordanalyzer/output.csv
 wordanalyzer/__pycache__
