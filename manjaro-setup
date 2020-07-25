@@ -11,22 +11,6 @@ then
   exit 1
 fi
 
-function addRepositories() {
-  if [ ! -f "/usr/bin/curl" ]
-  then
-    echo "[MANJARO SETUP] Could not find command 'curl'. Installing curl..."
-    sudo pacman -Sy curl
-  fi
-
-  #echo "[MANJARO SETUP] Configuring repo for VSCode..."
-  #curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
-  #sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
-  #sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
-
-  #echo "[MANJARO SETUP] Configuring repo for Node.js..."
-  #curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
-}
-
 function installMediaCodecs() {
   echo "[MANJARO SETUP] Installing media codecs..."
   #sudo apt install -y ubuntu-restricted-extras
@@ -39,19 +23,19 @@ function installLibreOfficeAddons() {
 
 function installUtils() {
   echo "[MANJARO SETUP] Installing command-line utilities..."
-  #sudo apt install -y fortune-mod fortunes net-tools curl rar p7zip-full optipng pdftk pwgen
+  sudo pacman -Sy curl rar p7zip-full optipng pdftk pwgen fortune-mod fortunes
 }
 
 function installMisc() {
   echo "[MANJARO SETUP] Installing various different useful tools that are not available by default..."
-  #sudo apt install -y inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc thunderbird thunderbird-gnome-support transmission-gtk keepass2 nautilus-gtkhash gparted usb-creator-gtk fonts-sil-gentium
-  sudo pacman -Sy xdotool xsel keepass bcprov pdftk viewnior
+  # nautilus-gtkhash usb-creator-gtk thunderbird-gnome-support
+  sudo pacman -Sy thunderbird  inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc transmission-gtk gparted xdotool xsel keepass bcprov pdftk viewnior
 }
 
 function installDevTools() {
   echo "[MANJARO SETUP] Installing essential dev-tools..."
   sudo pacman -Sy jre11-openjdk-headless base-devel nodejs-lts-erbium npm git code
-  sudo npm config set ignore-scripts true
+  #sudo npm config set ignore-scripts true
   sudo npm install -g @angular/cli
 }
 
@@ -121,25 +105,20 @@ function optimizeMirrors() {
 function installGraphicsDrivers() {
   # found at https://itsfoss.com/install-remove-software-manjaro/
   sudo mhwd -i pci video-nvidia-440xx
-  sudo nvidia-settings
+  #sudo nvidia-settings # can only be done on restart
 }
 
 ## MAIN ##
 
 echo "[MANJARO SETUP] Starting Manjaro setup..."
 
-optimizeMirrors
-
-#addAptRepositories
-
-#sudo pacman -Sy manjaro-xfce-settings
-
-installGraphicsDrivers
+#optimizeMirrors
+#installGraphicsDrivers
 
 #installGnomeShell
 #installLaptopModeTools
 #installLibreOfficeAddons
-installUtils
+#installUtils
 #installMediaCodecs
 installMisc
 #installDevTools
@@ -147,11 +126,11 @@ installMisc
 #installLatex
 
 #createCustomFontDirectory
-configureGnomeSettings
+#configureGnomeSettings
 #disableSystemShortcuts
 
-#sudo apt update && sudo apt upgrade -y # update all install packages
-#sudo apt autoremove -y # remove unused packages
+# check for updates for all installed packages
+sudo pacman -Syu
 
 echo "[MANJARO SETUP] Manjaro setup is complete."
 exit 0
