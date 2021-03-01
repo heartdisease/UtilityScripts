@@ -51,6 +51,15 @@ function installWine() {
 	fi
 }
 
+function installVeracrypt() {
+	if ! command -v veracrypt &>/dev/null
+	then
+		sudo add-apt-repository ppa:unit193/encryption --yes
+		sudo apt update
+		sudo apt install -y veracrypt
+	fi
+}
+
 function installJava() {
 	if ! command -v java &>/dev/null
 	then
