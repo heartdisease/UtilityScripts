@@ -1,66 +1,139 @@
 #!/bin/bash
-
-#VERSION_CODE_NAME=$(lsb_release -sc)
-
-if [ "$(lsb_release -si)" != "Ubuntu" ]
-then
-	echo "[UBUNTU SETUP] Your operating system is not supported! Abort."
-	exit 1
-fi
-
-if [ "$USERNAME" == "root" ]
-then
-	echo "[UBUNTU SETUP] Please do not execute this script as root! Abort."
-	exit 1
-fi
-
-function addAptRepositories() {
-	if [ ! -f "/usr/bin/curl" ]
-	then
-	  echo "[UBUNTU SETUP] Could not find command 'curl'. Installing curl..."
-		sudo apt install -y curl
-	fi
-
-	echo "[UBUNTU SETUP] Configuring repo for VSCode..."
-	curl https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > microsoft.gpg
-	sudo mv microsoft.gpg /etc/apt/trusted.gpg.d/microsoft.gpg
-	sudo sh -c 'echo "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main" > /etc/apt/sources.list.d/vscode.list'
-
-	echo "[UBUNTU SETUP] Configuring repo for Node.js..."
-	curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
-}
-
-function installMediaCodecs() {
-	echo "[UBUNTU SETUP] Installing media codecs..."
-	sudo apt install -y ubuntu-restricted-extras
-}
-
-function installLibreOfficeAddons() {
-	echo "[UBUNTU SETUP] Installing LibreOffice add-ons..."
-	sudo apt install -y libreoffice-gtk3 libreoffice-style-sifr libreoffice-pdfimport libreoffice-ogltrans libreoffice-writer2latex
-}
-
-function installUtils() {
-	echo "[UBUNTU SETUP] Installing command-line utilities..."
-	sudo apt install -y fortune-mod fortunes net-tools curl rar p7zip-full optipng pdftk pwgen
+function installBasics() {
+	echo "[UBUNTU SETUP] Install basic command line utilities..."
+	sudo apt install -y net-tools wget curl software-properties-common apt-transport-https hashalot rng-tools fortune-mod fortunes rar p7zip-full optipng pdftk pwgen
 }
 
 function installMisc() {
 	echo "[UBUNTU SETUP] Installing various different useful tools that are not available by default..."
-	sudo apt install -y inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc thunderbird thunderbird-gnome-support transmission-gtk keepass2 nautilus-gtkhash gparted usb-creator-gtk fonts-sil-gentium
+	sudo apt install -y ubuntu-restricted-extras inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc thunderbird thunderbird-gnome-support transmission-gtk keepass2 nautilus-gtkhash gparted usb-creator-gtk
+}
+
+function installFirewall() {
+	echo "Installing firewall (UFW)..."
+	sudo apt install -y ufw
+	sudo ufw enable
+}
+
+function installGoogleChrome() {
+	if ! command -v google-chrome &>/dev/null
+	then
+		dl_url="https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+		dl_file="$HOME/Downloads/$(echo $dl_url | sed -E 's/^.*\/([^\/]+)$/\1/')"
+
+		if ! [ -f $dl_file ]
+		then
+			wget -O $dl_file $dl_url
+		fi
+
+		sudo apt install -y $dl_file
+	fi
+}
+
+function installWine() {
+	if ! command -v winecfg &>/dev/null
+	then
+		# enable multiarch (allows to install both 64 and 32-bit packages on the same machine)
+		sudo dpkg --add-architecture i386
+
+		# import the WineHQ repository’s GPG key
+		wget -qO- https://dl.winehq.org/wine-builds/winehq.key | sudo apt-key add -
+		sudo apt-add-repository "deb http://dl.winehq.org/wine-builds/ubuntu/ $(lsb_release -sc) main"
+
+		sudo apt update
+		sudo apt install -y --install-recommends winehq-stable
+
+		echo "Confirm installation of all required Wine packages:"
+
+		winecfg &>/dev/null &
+		echo "Press enter to continue..."
+		read
+	fi
+}
+
+function installJava() {
+	if ! command -v java &>/dev/null
+	then
+		echo "Installing JDK..."
+		sudo apt install openjdk-8-jdk openjdk-8-source
+
+		# Adds the JAVA_HOME environment variable
+		echo 'JAVA_HOME="/usr/lib/jvm/java-8-openjdk-amd64"' | sudo tee -a /etc/environment
+
+		# Loads the environment description
+		source /etc/environment
+	fi
+}
+
+function installNodeJs() {
+	if ! command -v nvm &>/dev/null
+	then
+		echo "Installing Node Version Manager..."
+		wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.37.2/install.sh | bash
+		nvm install --lts
+		nvm use --lts
+	fi
+}
+
+function installVsCode() {
+	if ! command -v code &>/dev/null
+	then
+		wget -q https://packages.microsoft.com/keys/microsoft.asc -O- | sudo apt-key add -
+		sudo add-apt-repository "deb [arch=amd64] https://packages.microsoft.com/repos/vscode stable main"
+
+		sudo apt update
+		sudo apt install -y code
+	fi
+}
+
+function installIntelliJ() {
+	sudo apt install -y snapd
+	sudo snap install intellij-idea-community --classic
+
+	# increase the max_user_watches config option
+	echo "fs.inotify.max_user_watches=524288" | sudo tee /etc/sysctl.d/20-inotify-watches.conf
+	# increase the max files config option
+	echo "fs.file-max=2097152" | sudo tee /etc/sysctl.d/20-max-files.conf
+	# apply changes
+	sudo sysctl -p --system
+}
+
+function installGit() {
+	echo "Installing Git..."
+	sudo apt install -y git bash-completion
+
+	echo "Creating .gitconfig for user $USER..."
+	git config --global user.name "Christoph Matscheko"
+	git config --global user.email "christoph.matscheko@gmx.net"
+	git config --global pull.rebase true
+	# enable Git credential storage
+	git config --global credential.helper store
+
+	git clone https://github.com/magicmonty/bash-git-prompt.git ~/.bash-git-prompt --depth=1
+	echo >> ~/.bashrc
+	echo "# activate bash-git-prompt" >> ~/.bashrc
+	echo "if [ -f \"\$HOME/.bash-git-prompt/gitprompt.sh\" ]; then" >> ~/.bashrc
+	echo "  GIT_PROMPT_ONLY_IN_REPO=1 # Use the default prompt when not in a git repo." >> ~/.bashrc
+	echo "  GIT_PROMPT_FETCH_REMOTE_STATUS=0 # Avoid fetching remote status" >> ~/.bashrc
+	echo "  GIT_PROMPT_SHOW_UPSTREAM=0 # Don't display upstream tracking branch" >> ~/.bashrc
+	echo "  GIT_SHOW_UNTRACKED_FILES=no # Don't count untracked files (no, normal, all)" >> ~/.bashrc
+	echo "  source \$HOME/.bash-git-prompt/gitprompt.sh" >> ~/.bashrc
+	echo "fi" >> ~/.bashrc
 }
 
 function installDevTools() {
 	echo "[UBUNTU SETUP] Installing essential dev-tools..."
-	sudo apt install -y build-essential openjdk-11-jdk nodejs npm git code
-	sudo npm install -g @angular/cli
+
+	installGit
+	installJava
+	installVsCode
+	installIntelliJ
+	sudo apt install -y build-essential
 }
 
 function installGnomeShell() {
 	echo "[UBUNTU SETUP] Installing gnome-shell and related utilities..."
 	sudo apt install -y gnome-shell gnome-session gnome-tweak-tool menulibre
-	echo "[HINT] --> Manually select '/usr/share/gnome-shell/theme/gnome-shell.css':"
-	sudo update-alternatives --config gdm3.css
 }
 
 function installLaptopModeTools() {
@@ -101,38 +174,40 @@ function disableSystemShortcuts() {
 	gsettings set org.gnome.desktop.wm.keybindings panel-main-menu '[]'
 }
 
-function createCustomFontDirectory() {
-	ttf_extra="/usr/share/fonts/truetype/ttf-extra"
-
-	if [ ! -d "$ttf_extra" ]
-	then
-	  echo "[UBUNTU SETUP] Creating font directory '$ttf_extra' for user defined TrueType fonts..."
-		sudo mkdir -m 744 "$ttf_extra"
-	else
-	  echo "[UBUNTU SETUP] Custom font directory '$ttf_extra' already exists. Nothing to do."
-	fi
-}
-
 ## MAIN ##
 
 echo "[UBUNTU SETUP] Starting Ubuntu setup..."
 
-#addAptRepositories
+if [ "$(lsb_release -si)" != "Ubuntu" ]
+then
+	echo "[UBUNTU SETUP] Your operating system is not supported! Abort."
+	exit 1
+fi
+
+if [ "$USERNAME" == "root" ]
+then
+	echo "[UBUNTU SETUP] Please do not execute this script as root! Abort."
+	exit 1
+fi
+
+configureGnomeSettings
+disableSystemShortcuts
+
 sudo apt update
 
-#installGnomeShell
-#installLaptopModeTools
-#installLibreOfficeAddons
-installUtils
-#installMediaCodecs
+installBasics
 installMisc
-installDevTools
-#installAnthy
-#installLatex
+installFirewall
+installGnomeShell
 
-#createCustomFontDirectory
-#configureGnomeSettings
-#disableSystemShortcuts
+installMisc
+installWine
+installDevTools
+installGoogleChrome
+
+#installLaptopModeTools
+#installLatex
+#installAnthy
 
 sudo apt update && sudo apt upgrade -y # update all install packages
 sudo apt autoremove -y # remove unused packages
