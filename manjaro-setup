@@ -104,7 +104,7 @@ function optimizeMirrors() {
 
 function installGraphicsDrivers() {
   # found at https://itsfoss.com/install-remove-software-manjaro/
-  sudo mhwd -i pci video-nvidia-440xx
+  sudo mhwd -i pci video-nvidia-450xx
   #sudo nvidia-settings # can only be done on restart
 }
 
