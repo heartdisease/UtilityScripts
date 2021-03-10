@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+import sys
+
+from PIL import Image, ImageSequence
+
+# script found at https://unix.stackexchange.com/questions/419761/webp-animation-to-gif-animation-cli#answer-624293
+def convert_webp_to_gif(input_path, output_path):
+	im = Image.open(input_path)
+	im.save(output_path, 'gif', save_all=True, optimize=True, background=0)
+#end def
+
+if len(sys.argv) <= 1:
+	print('Invalid number of arguments!')
+	print('Usage: webp2gif input1.webp [input2.webp, ...]')
+	exit(1)
+
+for i in range(1, len(sys.argv)):
+	convert_webp_to_gif(sys.argv[i], sys.argv[i] + '.gif')
+#end for
