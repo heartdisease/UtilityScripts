@@ -6,7 +6,18 @@ function installBasics() {
 
 function installMisc() {
 	echo "[UBUNTU SETUP] Installing various different useful tools that are not available by default..."
-	sudo apt install -y ubuntu-restricted-extras inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc thunderbird thunderbird-gnome-support transmission-gtk keepass2 nautilus-gtkhash gparted usb-creator-gtk
+	sudo apt install -y ubuntu-restricted-extras fish inkscape gimp gthumb totem filezilla pidgin pidgin-otr vlc thunderbird thunderbird-gnome-support transmission-gtk keepass2 nautilus-gtkhash gparted usb-creator-gtk
+
+	if ! command -v cowsay &>/dev/null
+	then
+		echo "[UBUNTU SETUP] Installing gimmicks..."
+		sudo apt install -y cowsay fortune-mod fortunes
+
+		echo >> ~/.bashrc
+		echo "fortune | cowsay" >> ~/.bashrc
+		echo "echo \"=========================================\"" >> ~/.bashrc
+		echo "echo" >> ~/.bashrc
+	fi
 }
 
 function installFirewall() {
@@ -38,7 +49,7 @@ function installWine() {
 
 		# import the WineHQ repository’s GPG key
 		wget -qO- https://dl.winehq.org/wine-builds/winehq.key | sudo apt-key add -
-		sudo apt-add-repository "deb http://dl.winehq.org/wine-builds/ubuntu/ $(lsb_release -sc) main"
+		sudo apt-add-repository -y "deb http://dl.winehq.org/wine-builds/ubuntu/ $(lsb_release -sc) main"
 
 		sudo apt update
 		sudo apt install -y --install-recommends winehq-stable
@@ -48,6 +59,15 @@ function installWine() {
 		winecfg &>/dev/null &
 		echo "Press enter to continue..."
 		read
+	fi
+}
+
+function installLutris() {
+	if ! command -v lutris &>/dev/null
+	then
+		sudo add-apt-repository -y ppa:lutris-team/lutris
+		sudo apt update
+		sudo apt install lutris
 	fi
 }
 
@@ -108,26 +128,29 @@ function installIntelliJ() {
 }
 
 function installGit() {
-	echo "Installing Git..."
-	sudo apt install -y git bash-completion
+	if ! command -v git &>/dev/null
+	then
+		echo "[UBUNTU SETUP] Installing Git..."
+		sudo apt install -y git bash-completion
 
-	echo "Creating .gitconfig for user $USER..."
-	git config --global user.name "Christoph Matscheko"
-	git config --global user.email "christoph.matscheko@gmx.net"
-	git config --global pull.rebase true
-	# enable Git credential storage
-	git config --global credential.helper store
+		echo "Creating .gitconfig for user $USER..."
+		git config --global user.name "Christoph Matscheko"
+		git config --global user.email "christoph.matscheko@gmx.net"
+		git config --global pull.rebase true
+		# enable Git credential storage
+		git config --global credential.helper store
 
-	git clone https://github.com/magicmonty/bash-git-prompt.git ~/.bash-git-prompt --depth=1
-	echo >> ~/.bashrc
-	echo "# activate bash-git-prompt" >> ~/.bashrc
-	echo "if [ -f \"\$HOME/.bash-git-prompt/gitprompt.sh\" ]; then" >> ~/.bashrc
-	echo "  GIT_PROMPT_ONLY_IN_REPO=1 # Use the default prompt when not in a git repo." >> ~/.bashrc
-	echo "  GIT_PROMPT_FETCH_REMOTE_STATUS=0 # Avoid fetching remote status" >> ~/.bashrc
-	echo "  GIT_PROMPT_SHOW_UPSTREAM=0 # Don't display upstream tracking branch" >> ~/.bashrc
-	echo "  GIT_SHOW_UNTRACKED_FILES=no # Don't count untracked files (no, normal, all)" >> ~/.bashrc
-	echo "  source \$HOME/.bash-git-prompt/gitprompt.sh" >> ~/.bashrc
-	echo "fi" >> ~/.bashrc
+		git clone https://github.com/magicmonty/bash-git-prompt.git ~/.bash-git-prompt --depth=1
+		echo >> ~/.bashrc
+		echo "# activate bash-git-prompt" >> ~/.bashrc
+		echo "if [ -f \"\$HOME/.bash-git-prompt/gitprompt.sh\" ]; then" >> ~/.bashrc
+		echo "  GIT_PROMPT_ONLY_IN_REPO=1 # Use the default prompt when not in a git repo." >> ~/.bashrc
+		echo "  GIT_PROMPT_FETCH_REMOTE_STATUS=0 # Avoid fetching remote status" >> ~/.bashrc
+		echo "  GIT_PROMPT_SHOW_UPSTREAM=0 # Don't display upstream tracking branch" >> ~/.bashrc
+		echo "  GIT_SHOW_UNTRACKED_FILES=no # Don't count untracked files (no, normal, all)" >> ~/.bashrc
+		echo "  source \$HOME/.bash-git-prompt/gitprompt.sh" >> ~/.bashrc
+		echo "fi" >> ~/.bashrc
+	fi
 }
 
 function installDevTools() {
@@ -138,6 +161,51 @@ function installDevTools() {
 	installVsCode
 	installIntelliJ
 	sudo apt install -y build-essential
+}
+
+function installWebP() {
+	echo "[UBUNTU SETUP] Installing webp utilities..."
+
+	installGit
+	sudo apt install -y webp python3-pip meson ninja-build cmake libgdk-pixbuf2.0-dev libwebp-dev
+
+	local curr_dir=$PWD
+	cd ~/Downloads
+	if ! [ -d "webp-pixbuf-loader/.git" ]
+	then
+		git clone https://github.com/aruiz/webp-pixbuf-loader.git
+	fi
+	cd webp-pixbuf-loader
+	meson builddir -Dgdk_pixbuf_query_loaders_path=/usr/lib/x86_64-linux-gnu/gdk-pixbuf-2.0/gdk-pixbuf-query-loaders
+	ninja -C builddir
+	sudo ninja -C builddir install
+	cd $curr_dir
+
+	python3 -m pip install --user --upgrade Pillow
+	python3 -m pip install --user --upgrade apng
+
+	cp webp2gif ~/.local/bin
+	chmod +x ~/.local/bin/webp2gif
+
+	cp webp2png ~/.local/bin
+	chmod +x ~/.local/bin/webp2png
+}
+
+function installSignal() {
+  if ! command -v signal-desktop &>/dev/null
+  then
+    # 1. Install our official public software signing key
+    wget -O- https://updates.signal.org/desktop/apt/keys.asc | gpg --dearmor > signal-desktop-keyring.gpg
+    sudo mv signal-desktop-keyring.gpg /usr/share/keyrings/
+
+    # 2. Add our repository to your list of repositories
+    echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/signal-desktop-keyring.gpg] https://updates.signal.org/desktop/apt xenial main' |\
+    sudo tee -a /etc/apt/sources.list.d/signal-xenial.list
+
+    # 3. Update your package database and install signal
+    sudo apt update
+    sudo apt install -y signal-desktop
+  fi
 }
 
 function installGnomeShell() {
@@ -162,8 +230,7 @@ function installAnthy() {
 }
 
 function configureGnomeSettings() {
-	echo "[UBUNTU SETUP] Configuring GNOME user settings..."
-
+	echo "[UBUNTU SETUP] Adjust GNOME user settings for Gedit and Nautilus ..."
 	gsettings set org.gnome.nautilus.preferences default-sort-order 'type'
 	gsettings set org.gnome.nautilus.preferences executable-text-activation 'ask'
 
@@ -172,15 +239,22 @@ function configureGnomeSettings() {
 	gsettings set org.gnome.gedit.preferences.editor bracket-matching true
 	gsettings set org.gnome.gedit.preferences.editor scheme 'oblivion'
 	gsettings set org.gnome.gedit.preferences.editor auto-indent true
+	gsettings set org.gnome.gedit.preferences.editor insert-spaces true
 	gsettings set org.gnome.gedit.preferences.editor tabs-size 'uint32 2'
-}
 
-function disableSystemShortcuts() {
-	echo "[UBUNTU SETUP] Disabling GNOME default shortcuts that interfere with IDEs..."
+	echo "[UBUNTU SETUP] Disabling GNOME default shortcuts that interfere with IntelliJ and VSCode..."
+	gsettings set org.gnome.desktop.wm.keybindings toggle-shaded "[]"
+	gsettings set org.gnome.desktop.wm.keybindings begin-move "[]"
+	gsettings set org.gnome.desktop.wm.keybindings panel-main-menu "[]"
 
-  gsettings set org.gnome.desktop.wm.keybindings toggle-shaded '[]'
-	gsettings set org.gnome.desktop.wm.keybindings begin-move '[]'
-	gsettings set org.gnome.desktop.wm.keybindings panel-main-menu '[]'
+	gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-right "[]"
+	gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-left "[]"
+	gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-down "['<Super><Shift>Page_Down']"
+	gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-up "['<Super><Shift>Page_Up']"
+
+	echo "[UBUNTU SETUP] Set mouse acceleration profile to 'flat' to avoid drag and drop issues..."
+	gsettings set org.gnome.desktop.peripherals.mouse accel-profile 'flat'
+	gsettings set org.gnome.desktop.peripherals.mouse speed 'double 1.0'
 }
 
 ## MAIN ##
@@ -200,17 +274,19 @@ then
 fi
 
 configureGnomeSettings
-disableSystemShortcuts
 
 sudo apt update
 
 installBasics
 installMisc
+installWebP
 installFirewall
 installGnomeShell
 
 installMisc
+installSignal
 installWine
+installLutris
 installDevTools
 installGoogleChrome
 
@@ -218,9 +294,9 @@ installGoogleChrome
 #installLatex
 #installAnthy
 
-sudo apt update && sudo apt upgrade -y # update all install packages
-sudo apt autoremove -y # remove unused packages
+sudo apt update
+sudo apt upgrade -y
+sudo apt autoremove -y
 
 echo "[UBUNTU SETUP] Ubuntu setup is done."
 exit 0
-
