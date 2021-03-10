@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+import sys
+import os
+
+from PIL import Image, ImageSequence
+from apng import APNG
+
+# script found at https://unix.stackexchange.com/questions/419761/webp-animation-to-gif-animation-cli#answer-624293
+def convert_webp_to_png(input_path, output_path):
+	im = Image.open(input_path)
+
+	index = 0
+	frames = []
+
+	for frame in ImageSequence.Iterator(im):
+		frame_output_file = "~temp-%s-frame-%d.png" % (os.path.basename(input_path), index)
+
+		frame.save(frame_output_file)
+		frames.append(frame_output_file)
+		print("save frame %d to %s" % (index, frame_output_file))
+		index = index + 1
+	#end for
+	
+	if index > 1:
+		print("save APNG from %d frames" % index)
+		APNG.from_files(frames, delay=100).save(output_path)
+
+		for frame in frames:
+			os.remove(frame)
+		#end for
+	else:
+		print("convert webp to regular png")
+		os.rename(frames[0], output_path)
+	#end if
+#end def
+
+if len(sys.argv) <= 1:
+	print('Invalid number of arguments!')
+	print('Usage: webp2png input1.webp [input2.webp, ...]')
+	exit(1)
+
+for i in range(1, len(sys.argv)):
+	convert_webp_to_png(sys.argv[i], sys.argv[i] + '.png')
+#end for
