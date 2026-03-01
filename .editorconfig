@@ -1,0 +1,19 @@
+# Mark this file as the root configuration
+root = true
+
+# Universal settings for all files
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 2
+indent_style = space
+max_line_length = 100
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+[{*.yml,*.yaml}]
+max_line_length = off

@@ -1,6 +1,8 @@
 .*
 *~
 
+!.vscode
+!.editorconfig
 !.gitignore
 
 *.png
