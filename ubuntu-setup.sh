@@ -58,15 +58,21 @@ function installMultimediaUtils() {
 }
 
 function installMsFonts() {
-  # TODO check: fc-list | grep -oi "arial\|times\|verdana"
-  # install ms core fonts
-  sudo apt install ttf-mscorefonts-installer fonts-crosextra-carlito fonts-crosextra-caladea
-  sudo fc-cache -fv
-
-  # TODO check: fc-list | grep -oi "Calibri\|etc."
-  # installing proprietary MS fonts
-  sudo apt install cabextract fontforge
-  downloadAndExecute https://gist.github.com/maxwelleite/10774746/raw/ttf-vista-fonts-installer.sh 5f7156c1f7598eaf65710061bd96d54a5e10843a78c4bd9cbdd18ed850c91401d464fa9ac7b2f1d245f51da1990e049d7b72bbf19a058fcd8951fb98ade830ce true
+  if ! read -r -n1 -d "" < <(fc-list | grep -oi "Arial.ttf\|Verdana.ttf\|times.ttf"); then
+    echo "[UBUNTU SETUP] Installing MS core fonts..."
+    echo sudo apt install -y ttf-mscorefonts-installer fonts-crosextra-carlito fonts-crosextra-caladea
+    echo sudo fc-cache -fv
+  else
+    echo "[UBUNTU SETUP] MS Core Fonts are already installed. Nothing to do."
+  fi
+  if ! read -r -n1 -d "" < <(fc-list | grep -oi "calibri.ttf"); then
+    echo "[UBUNTU SETUP] Installing MS proprietary fonts..."
+    echo sudo apt install -y cabextract fontforge
+    echo downloadAndExecute https://gist.github.com/maxwelleite/10774746/raw/ttf-vista-fonts-installer.sh 5f7156c1f7598eaf65710061bd96d54a5e10843a78c4bd9cbdd18ed850c91401d464fa9ac7b2f1d245f51da1990e049d7b72bbf19a058fcd8951fb98ade830ce true
+    # script calls `sudo fc-cache -fv` automatically after installation
+  else
+    echo "[UBUNTU SETUP] MS proprietary fonts are already installed. Nothing to do."
+  fi
 }
 
 function installBrave() {
@@ -380,7 +386,7 @@ function startUbuntuSetup() {
   installDevTools
   installGnomeShell
 
-  #installMsFonts
+  installMsFonts
 
   configureGnomeSettings
 
