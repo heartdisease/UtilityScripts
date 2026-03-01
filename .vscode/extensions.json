@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "eamodio.gitlens",
+    "ms-python.python",
+    "editorconfig.editorconfig",
+    "mads-hartmann.bash-ide-vscode",
+    "timonwong.shellcheck",
+    "mkhl.shfmt",
+    "charliermarsh.ruff"
+  ]
+}
