@@ -115,6 +115,15 @@ function installSignal() {
   fi
 }
 
+function installElement() {
+  if ! command -v element-desktop &>/dev/null; then
+    sudo snap install element-desktop
+    sudo snap connect element-desktop:password-manager-service
+  else
+    echo "[UBUNTU SETUP] Element is already installed. Nothing to do."
+  fi
+}
+
 function installInkscape() {
   if ! command -v inkscape &>/dev/null; then
     sudo snap install inkscape
@@ -378,6 +387,7 @@ function startUbuntuSetup() {
   installSpotify
   installVlc
   installSignal
+  installElement
   installInkscape
 
   installSteam
@@ -395,6 +405,7 @@ function startUbuntuSetup() {
   sudo apt autoremove -y
 
   sudo snap refresh
+  flatpak update
 
   echo "[UBUNTU SETUP] Setup complete!"
   exit 0
