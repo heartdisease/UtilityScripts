@@ -101,6 +101,14 @@ function installVlc() {
   fi
 }
 
+function installSignal() {
+  if ! command -v signal-desktop &>/dev/null; then
+    sudo snap install signal-desktop
+  else
+    echo "[UBUNTU SETUP] Signal is already installed. Nothing to do."
+  fi
+}
+
 function installInkscape() {
   if ! command -v inkscape &>/dev/null; then
     sudo snap install inkscape
@@ -174,15 +182,15 @@ function installVeracrypt() {
 }
 
 function installNodeJs() {
-  if ! command -v nvm &>/dev/null; then
-    echo "[UBUNTU SETUP] Downloading and installing Node Version Manager (NVM)..."
+  if ! [ -f ~/.nvm/nvm.sh ]; then
+    echo "[UBUNTU SETUP] Downloading and installing Node Version Manager (nvm)..."
     downloadAndExecute https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh a8e082d8d1a9b61a09e5d3e1902d2930e5b1b84a86f9777c7d2eb50ea204c0141f6a97c54a860bc3282e7b000f1c669c755f5e0db7bd6d492072744c302c0a21
 
     echo "[UBUNTU SETUP] Installing lates LTS version of Node.js..."
     nvm install --lts
     nvm use --lts
   else
-    echo "[UBUNTU SETUP] nvm is already installed. Nothing to do."
+    echo "[UBUNTU SETUP] Node Version Manager (nvm) is already installed. Nothing to do."
   fi
 }
 
@@ -328,6 +336,12 @@ function configureGnomeSettings() {
 }
 
 function startUbuntuSetup() {
+  if [[ -n "$BASH_VERSION" ]]; then
+    echo "[UBUNTU SETUP] Script is running in Bash ($BASH_VERSION)."
+  else
+    echo "[UBUNTU SETUP] Script is not running in Bash. Abort."
+    exit 1
+  fi
   if [ "$USERNAME" == "root" ]; then
     echo "[UBUNTU SETUP] This script is not intended to be run as root! Run as local user instead! Abort."
     exit 1
@@ -357,6 +371,7 @@ function startUbuntuSetup() {
   installThunderbird
   installSpotify
   installVlc
+  installSignal
   installInkscape
 
   installSteam
