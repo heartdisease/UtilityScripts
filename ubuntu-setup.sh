@@ -1,8 +1,8 @@
 #!/bin/bash
-function downloadAndExecute() {
+function downloadAndVerify() {
   local url=$1
-  local controlHash=$2
-  local runAsRoot=$3
+  local fileName=$2
+  local controlHash=$3
 
   local tempFile
   local fileHash
@@ -14,22 +14,14 @@ function downloadAndExecute() {
     sudo apt install -y rhash
   fi
 
-  tempFile=$(mktemp)
+  tempFile=$(mktemp --suffix=".$fileName")
+  echo "Downloading '$url' to $tempFile..."
   wget "$url" -qO "$tempFile"
-  fileHash=$(rhash --sha512 "$tempFile" | grep -Eo '^\w+')
+  fileHash=$(rhash --sha512 "$tempFile" | grep -oE '^\w+')
 
   if [[ "$fileHash" == "$controlHash" ]]; then
     echo "File hash matches ($url --> $tempFile)! [sha512.$fileHash]"
-    echo "Making file executable..."
-    chmod +x "$tempFile"
-
-    echo "Executing file..."
-    if [[ "$runAsRoot" == "true" ]]; then
-      sudo "$tempFile"
-    else
-      # shellcheck disable=SC1090
-      . "$tempFile"
-    fi
+    UBUNTU_SETUP_LAST_DOWNLOADED_FILE=$tempFile
   else
     echo "Downloaded file is corrupt!"
     echo "File hash ($url --> $tempFile): sha512.$fileHash"
@@ -37,9 +29,27 @@ function downloadAndExecute() {
     echo "Abort."
     exit 1
   fi
+}
 
-  echo "Removing temp file $tempFile..."
-  rm -vf "$tempFile"
+function downloadAndExecute() {
+  local url=$1
+  local fileName=$2
+  local controlHash=$3
+  local runAsRoot=$4
+
+  downloadAndVerify "$1" "$2" "$3"
+  local tempFile=$UBUNTU_SETUP_LAST_DOWNLOADED_FILE
+
+  echo "Making file executable..."
+  chmod +x "$tempFile"
+
+  echo "Executing file..."
+  if [[ "$runAsRoot" == "true" ]]; then
+    sudo "$tempFile"
+  else
+    # shellcheck disable=SC1090
+    . "$tempFile"
+  fi
 }
 
 function installCommandlineBasics() {
@@ -60,19 +70,61 @@ function installMultimediaUtils() {
 function installMsFonts() {
   if ! read -r -n1 -d "" < <(fc-list | grep -oi "Arial.ttf\|Verdana.ttf\|times.ttf"); then
     echo "[UBUNTU SETUP] Installing MS core fonts..."
-    echo sudo apt install -y ttf-mscorefonts-installer fonts-crosextra-carlito fonts-crosextra-caladea
-    echo sudo fc-cache -fv
+    sudo apt install -y ttf-mscorefonts-installer fonts-crosextra-carlito fonts-crosextra-caladea
+    sudo fc-cache -fv
   else
     echo "[UBUNTU SETUP] MS Core Fonts are already installed. Nothing to do."
   fi
   if ! read -r -n1 -d "" < <(fc-list | grep -oi "calibri.ttf"); then
     echo "[UBUNTU SETUP] Installing MS proprietary fonts..."
-    echo sudo apt install -y cabextract fontforge
-    echo downloadAndExecute https://gist.github.com/maxwelleite/10774746/raw/ttf-vista-fonts-installer.sh 5f7156c1f7598eaf65710061bd96d54a5e10843a78c4bd9cbdd18ed850c91401d464fa9ac7b2f1d245f51da1990e049d7b72bbf19a058fcd8951fb98ade830ce true
+    sudo apt install -y cabextract fontforge
+    downloadAndExecute https://gist.github.com/maxwelleite/10774746/raw/ttf-vista-fonts-installer.sh ttf-vista-fonts-installer.sh 5f7156c1f7598eaf65710061bd96d54a5e10843a78c4bd9cbdd18ed850c91401d464fa9ac7b2f1d245f51da1990e049d7b72bbf19a058fcd8951fb98ade830ce true
     # script calls `sudo fc-cache -fv` automatically after installation
   else
     echo "[UBUNTU SETUP] MS proprietary fonts are already installed. Nothing to do."
   fi
+}
+
+function installCustomFonts() {
+  echo "[UBUNTU SETUP] Installing custom fonts..."
+
+  if ! [ -d /usr/share/fonts/opentype/montserrat ]; then
+    echo "[UBUNTU SETUP] Downloading and installing font Montserrat..."
+    downloadAndVerify https://www.1001fonts.com/download/montserrat.zip montserrat.zip ae0a63dbf2fe11f1321c1c906307cfa7ea3e3248dc510b5cb6edcaf43899b26b0e0488a87c24fc9e9b64d8bce89740560df751cc7ee6273070b2199ab8248a35
+    sudo mkdir /usr/share/fonts/opentype/montserrat
+    sudo unzip -d /usr/share/fonts/opentype/montserrat -j "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE" "*.otf"
+  else
+    echo "[UBUNTU SETUP] Font Montserrat is already installed. Skip."
+  fi
+
+  if ! [ -d /usr/share/fonts/opentype/peppy-pegasus ]; then
+    echo "[UBUNTU SETUP] Downloading and installing font Peppy Pegasus..."
+    downloadAndVerify https://font.download/dl/font/peppy-pegasus.zip peppy-pegasus.zip c4f547665c1a60956ad07c343d6b923c4ed3287b93b08de083d75ce21d3c2fa2c1e7fb49268f1f2ece2e3d5811622d115ef31cb1777ffb3aad2194587093e9f8
+    sudo mkdir /usr/share/fonts/opentype/peppy-pegasus
+    sudo unzip -d /usr/share/fonts/opentype/peppy-pegasus -j "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE" "*.otf"
+  else
+    echo "[UBUNTU SETUP] Font Peppy Pegasus is already installed. Skip."
+  fi
+
+  if ! [ -d /usr/share/fonts/truetype/magic-unicorn ]; then
+    echo "[UBUNTU SETUP] Downloading and installing font Magic Unicorn..."
+    downloadAndVerify https://dl.dafont.com/dl/?f=magic_unicorn magic_unicorn.zip 75b5e780f07c1df881eb13b0bb58654e1ddbeb5978d9e954eeab6a7da0028ec43e84a73366f8241d71bb93330a7bfdfd2dd09a8619a4f75d0c7757fdb043bfc7
+    sudo mkdir /usr/share/fonts/truetype/magic-unicorn
+    sudo unzip -d /usr/share/fonts/truetype/magic-unicorn -j "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE" "*.ttf"
+  else
+    echo "[UBUNTU SETUP] Font Magic Unicorn is already installed. Skip."
+  fi
+
+  if ! [ -d /usr/share/fonts/opentype/magic-stary ]; then
+    echo "[UBUNTU SETUP] Downloading and installing font Magic Stary..."
+    downloadAndVerify https://dl.dafont.com/dl/?f=magic_stary magic_stary.zip 456e4c750ba8736dcd53597eed965ac9c24c5d8db34503fb698fca1a90594da993ace44a0fb8ac7a79c5f562faf1394370e8242db452b44810c767f6c6aa9433
+    sudo mkdir /usr/share/fonts/opentype/magic-stary
+    sudo unzip -d /usr/share/fonts/opentype/magic-stary -j "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE" "*.otf"
+  else
+    echo "[UBUNTU SETUP] Font Magic Stary is already installed. Skip."
+  fi
+
+  sudo fc-cache -fv
 }
 
 function installBrave() {
@@ -199,7 +251,7 @@ function installVeracrypt() {
 function installNodeJs() {
   if ! [ -f ~/.nvm/nvm.sh ]; then
     echo "[UBUNTU SETUP] Downloading and installing Node Version Manager (nvm)..."
-    downloadAndExecute https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh a8e082d8d1a9b61a09e5d3e1902d2930e5b1b84a86f9777c7d2eb50ea204c0141f6a97c54a860bc3282e7b000f1c669c755f5e0db7bd6d492072744c302c0a21
+    downloadAndExecute https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh nvm-install.sh a8e082d8d1a9b61a09e5d3e1902d2930e5b1b84a86f9777c7d2eb50ea204c0141f6a97c54a860bc3282e7b000f1c669c755f5e0db7bd6d492072744c302c0a21
 
     echo "[UBUNTU SETUP] Installing lates LTS version of Node.js..."
     nvm install --lts
@@ -397,6 +449,7 @@ function startUbuntuSetup() {
   installGnomeShell
 
   installMsFonts
+  installCustomFonts
 
   configureGnomeSettings
 
@@ -412,4 +465,5 @@ function startUbuntuSetup() {
 }
 
 ## MAIN ##
-startUbuntuSetup
+installCustomFonts
+#startUbuntuSetup
