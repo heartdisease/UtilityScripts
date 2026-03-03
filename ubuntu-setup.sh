@@ -371,14 +371,15 @@ function installDevTools() {
 
 function installGnomeShell() {
   echo "[UBUNTU SETUP] Installing gnome-shell and related utilities..."
-  sudo apt install -y ubuntu-gnome-desktop gnome-tweaks gnome-shell-extension-manager gnome-browser-connector
+  sudo apt install -y ubuntu-gnome-desktop gnome-tweaks gnome-shell-extension-manager gnome-browser-connector dconf-editor
 }
 
 function configureGnomeSettings() {
-  echo "[UBUNTU SETUP] Adjust GNOME user settings for Gedit and Nautilus ..."
+  echo "[UBUNTU SETUP] Adjust GNOME user settings for Nautilus..."
   gsettings set org.gnome.nautilus.preferences default-sort-order 'type'
-  gsettings set org.gnome.nautilus.preferences executable-text-activation 'ask'
+  gsettings set org.gnome.nautilus.preferences show-create-link true
 
+  echo "[UBUNTU SETUP] Adjust GNOME user settings for Gedit..."
   gsettings set org.gnome.gedit.preferences.editor display-line-numbers true
   gsettings set org.gnome.gedit.preferences.editor highlight-current-line true
   gsettings set org.gnome.gedit.preferences.editor bracket-matching true
@@ -387,10 +388,14 @@ function configureGnomeSettings() {
   gsettings set org.gnome.gedit.preferences.editor insert-spaces true
   gsettings set org.gnome.gedit.preferences.editor tabs-size 'uint32 2'
 
-  #echo "[UBUNTU SETUP] Disabling GNOME default shortcuts that interfere with IntelliJ and VSCode..."
-  #gsettings set org.gnome.desktop.wm.keybindings toggle-shaded "[]"
-  #gsettings set org.gnome.desktop.wm.keybindings begin-move "[]"
-  #gsettings set org.gnome.desktop.wm.keybindings panel-main-menu "[]"
+  echo "[UBUNTU SETUP] Adjust GNOME user settings to disable new tiling feature..."
+  gsettings set org.gnome.mutter.keybindings toggle-tiled-left "['<Super>Left']"
+  gsettings set org.gnome.mutter.keybindings toggle-tiled-right "['<Super>Right']"
+
+  echo "[UBUNTU SETUP] Adjust GNOME user settings to disable default shortcuts that interfere with VSCode..."
+  gsettings set org.gnome.desktop.wm.keybindings toggle-shaded "[]"
+  gsettings set org.gnome.desktop.wm.keybindings begin-move "[]"
+  gsettings set org.gnome.desktop.wm.keybindings panel-main-menu "[]"
 
   #gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-right "[]"
   #gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-left "[]"
@@ -465,5 +470,4 @@ function startUbuntuSetup() {
 }
 
 ## MAIN ##
-installCustomFonts
-#startUbuntuSetup
+startUbuntuSetup
