@@ -54,7 +54,7 @@ function downloadAndExecute() {
 
 function installCommandlineBasics() {
   echo "[UBUNTU SETUP] Install basic command line utilities..."
-  sudo apt install -y fish plocate rhash curl optipng rar p7zip-full pdftk-java
+  sudo apt install -y fish plocate rhash curl optipng rar p7zip-full pdftk-java mesa-utils
 }
 
 function installSystemUtils() {
@@ -238,6 +238,67 @@ function installVsCode() {
   fi
 }
 
+function installJava() {
+  if ! command -v javac &>/dev/null; then
+    sudo apt install -y default-jdk
+
+    echo "Adding JAVA_HOME to ~/.bashrc..."
+    echo >>~/.bashrc
+    # shellcheck disable=SC2016
+    echo 'export JAVA_HOME=$(readlink -f /usr/bin/javac | sed "s:/bin/javac::")' | tee -a ~/.bashrc
+
+    # shellcheck disable=SC1090
+    source ~/.bashrc
+  else
+    echo "[UBUNTU SETUP] Java is already installed. Nothing to do."
+  fi
+}
+
+function installGradle() {
+  if command -v gradle &>/dev/null; then
+    echo "[UBUNTU SETUP] Install Gradle..."
+    sudo apt install -y gradle
+
+    echo "Adding GRADLE_HOME to ~/.bashrc..."
+    echo >>~/.bashrc
+    # shellcheck disable=SC2016
+    echo 'export GRADLE_HOME=$(readlink -f /usr/bin/gradle | sed "s:/bin/gradle::")' | tee -a ~/.bashrc
+
+    # shellcheck disable=SC1090
+    source ~/.bashrc
+  else
+    echo "[UBUNTU SETUP] Gradle is already installed. Nothing to do."
+  fi
+}
+
+function installAndroidStudio() {
+  if ! command -v android-studio &>/dev/null; then
+    echo "[UBUNTU SETUP] Install Android Studio and Android SDK..."
+    installJava
+    installGradle
+    sudo apt install -y google-android-cmdline-tools-11.0-installer
+    sudo sdkmanager "cmdline-tools;latest" "build-tools;36.0.0" "platform-tools" "emulator" "platforms;android-36" "system-images;android-36;google_apis;x86_64"
+    avdmanager create avd --force --name Pixel10_API36 --package "system-images;android-36;google_apis;x86_64"
+    #emulator -avd Pixel10_API36 -netdelay none -netspeed full
+
+    echo "Adding ANDROID_HOME to ~/.bashrc..."
+    echo >>~/.bashrc
+    echo "export ANDROID_HOME=/usr/lib/android-sdk" | tee -a ~/.bashrc
+    # shellcheck disable=SC2016
+    echo 'export ANDROID_SDK_ROOT=$ANDROID_HOME' | tee -a ~/.bashrc
+    # shellcheck disable=SC2016
+    echo 'export ANDROID_AVD_HOME=$HOME/.android/avd' | tee -a ~/.bashrc
+    echo >>~/.bashrc
+    # shellcheck disable=SC2016
+    echo 'export PATH=$PATH:$ANDROID_HOME/emulator' | tee -a ~/.bashrc
+
+    # shellcheck disable=SC1090
+    source ~/.bashrc
+  else
+    echo "[UBUNTU SETUP] Android Studio is already installed. Nothing to do."
+  fi
+}
+
 function installVeracrypt() {
   if ! command -v veracrypt &>/dev/null; then
     sudo add-apt-repository ppa:unit193/encryption -y
@@ -253,7 +314,9 @@ function installNodeJs() {
     echo "[UBUNTU SETUP] Downloading and installing Node Version Manager (nvm)..."
     downloadAndExecute https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh nvm-install.sh a8e082d8d1a9b61a09e5d3e1902d2930e5b1b84a86f9777c7d2eb50ea204c0141f6a97c54a860bc3282e7b000f1c669c755f5e0db7bd6d492072744c302c0a21
 
-    echo "[UBUNTU SETUP] Installing lates LTS version of Node.js..."
+    echo "[UBUNTU SETUP] Installing the latest LTS version of Node.js..."
+    # shellcheck disable=SC1090
+    source ~/.nvm/nvm.sh
     nvm install --lts
     nvm use --lts
   else
@@ -365,6 +428,7 @@ function installDevTools() {
   installRust
   installNodeJs
   installVsCode
+  installAndroidStudio
 
   sudo apt install -y build-essential gdb lldb shfmt
 }
