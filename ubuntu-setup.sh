@@ -118,56 +118,74 @@ function reconfigureVsCode() {
   fi
   if ! command -v nvm &>/dev/null; then
     installNodeJs
-    # shellcheck disable=SC1090
-    source ~/.nvm/nvm.sh
   fi
-
-  installCustomFonts
 
   node_24=$(nvm which 24)
 
   echo "Installing commonly used VSCode extensions..."
   code --install-extension vscode-icons-team.vscode-icons
   code --install-extension ms-vsliveshare.vsliveshare
-  code --install-extension ms-playwright.playwright
   code --install-extension editorconfig.editorconfig
   code --install-extension sanaajani.taskrunnercode
   code --install-extension eamodio.gitlens
-  code --install-extension esbenp.prettier-vscode
-  code --install-extension dbaeumer.vscode-eslint
-  code --install-extension rust-lang.rust-analyzer
-  code --install-extension ms-python.python
-  code --install-extension charliermarsh.ruff
-  code --install-extension mads-hartmann.bash-ide-vscode
-  code --install-extension timonwong.shellcheck
-  code --install-extension mkhl.shfmt
-  code --install-extension dohe.godot-format
-  code --install-extension geequlim.godot-tools
 
-  echo "Installing VSCode themes..."
-  code --install-extension atomiks.moonlight
+  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+    code --install-extension ms-playwright.playwright
+    code --install-extension esbenp.prettier-vscode
+    code --install-extension dbaeumer.vscode-eslint
+    code --install-extension rust-lang.rust-analyzer
+    code --install-extension ms-python.python
+    code --install-extension charliermarsh.ruff
+    code --install-extension mads-hartmann.bash-ide-vscode
+    code --install-extension timonwong.shellcheck
+    code --install-extension mkhl.shfmt
+    code --install-extension dohe.godot-format
+    code --install-extension geequlim.godot-tools
 
-  echo "Configuring basic user settings for VSCode..."
-  echo '{}' |
-    jq '."editor.tabSize" = 2' |
-    jq '."editor.formatOnSave" = false' |
-    jq '."editor.defaultFormatter" = "EditorConfig.EditorConfig"' |
-    jq '."editor.autoIndentOnPaste" = true' |
-    jq '."editor.snippetSuggestions" = "none"' |
-    jq '."editor.inlineSuggest.enabled" = false' |
-    jq '."editor.bracketPairColorization.independentColorPoolPerBracketType" = true' |
-    jq '."editor.fontFamily" = "'\''SeriousShanns Nerd Font Mono'\'', '\''Droid Sans Mono'\'', monospace"' |
-    jq '."github.copilot.nextEditSuggestions.enabled" = false' |
-    jq '."terminal.integrated.defaultProfile.linux" = "fish"' |
-    jq '."typescript.tsserver.nodePath" = "'"$node_24"'"' |
-    jq '."typescript.tsserver.maxTsServerMemory" = 10240' |
-    jq '."vsicons.dontShowNewVersionMessage" = true' |
-    jq '."window.zoomLevel" = 1.4' |
-    jq '."workbench.colorTheme" = "Moonlight II"' |
-    jq '."workbench.iconTheme" = "vscode-icons"' |
-    jq '."workbench.localHistory.maxFileEntries" = 25' |
-    jq '."workbench.localHistory.maxFileSize" = 512' \
-      >~/.config/Code/User/settings.json
+    echo "Installing VSCode themes..."
+    code --install-extension atomiks.moonlight
+
+    echo "Configuring Lena's user settings for VSCode..."
+    echo '{}' |
+      jq '."editor.tabSize" = 2' |
+      jq '."editor.formatOnSave" = false' |
+      jq '."editor.defaultFormatter" = "EditorConfig.EditorConfig"' |
+      jq '."editor.autoIndentOnPaste" = true' |
+      jq '."editor.snippetSuggestions" = "none"' |
+      jq '."editor.inlineSuggest.enabled" = false' |
+      jq '."editor.bracketPairColorization.independentColorPoolPerBracketType" = true' |
+      jq '."editor.fontFamily" = "'\''SeriousShanns Nerd Font Mono'\'', '\''Droid Sans Mono'\'', monospace"' |
+      jq '."github.copilot.nextEditSuggestions.enabled" = false' |
+      jq '."terminal.integrated.defaultProfile.linux" = "fish"' |
+      jq '."typescript.tsserver.nodePath" = "'"$node_24"'"' |
+      jq '."typescript.tsserver.maxTsServerMemory" = 10240' |
+      jq '."vsicons.dontShowNewVersionMessage" = true' |
+      jq '."window.zoomLevel" = 1.4' |
+      jq '."workbench.colorTheme" = "Moonlight II"' |
+      jq '."workbench.iconTheme" = "vscode-icons"' |
+      jq '."workbench.localHistory.maxFileEntries" = 25' |
+      jq '."workbench.localHistory.maxFileSize" = 512' \
+        >~/.config/Code/User/settings.json
+
+    installCustomFonts
+  else
+    echo "Configuring basic user settings for VSCode..."
+    echo '{}' |
+      jq '."editor.tabSize" = 2' |
+      jq '."editor.formatOnSave" = false' |
+      jq '."editor.defaultFormatter" = "EditorConfig.EditorConfig"' |
+      jq '."editor.autoIndentOnPaste" = true' |
+      jq '."editor.snippetSuggestions" = "none"' |
+      jq '."editor.inlineSuggest.enabled" = false' |
+      jq '."editor.bracketPairColorization.independentColorPoolPerBracketType" = true' |
+      jq '."github.copilot.nextEditSuggestions.enabled" = false' |
+      jq '."terminal.integrated.defaultProfile.linux" = "fish"' |
+      jq '."typescript.tsserver.nodePath" = "'"$node_24"'"' |
+      jq '."vsicons.dontShowNewVersionMessage" = true' |
+      jq '."window.zoomLevel" = 1' |
+      jq '."workbench.iconTheme" = "vscode-icons"' \
+        >~/.config/Code/User/settings.json
+  fi
 }
 
 function installCommandlineBasics() {
@@ -177,7 +195,10 @@ function installCommandlineBasics() {
 
 function installSystemUtils() {
   echo "[UBUNTU SETUP] Install basic system utilities..."
-  sudo apt install -y keepass2 gparted usb-creator-gtk
+  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+    sudo apt install -y keepass2
+  fi
+  sudo apt install -y gparted usb-creator-gtk
 }
 
 function installMultimediaUtils() {
@@ -319,6 +340,8 @@ function installVsCode() {
 }
 
 function installFlatpak() {
+  local disableSkipMessage=$1
+
   if ! command -v flatpak &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Flatpak..."
     sudo apt install -y flatpak gnome-software-plugin-flatpak
@@ -328,7 +351,7 @@ function installFlatpak() {
 
     flatpak update
     flatpak update --appstream
-  else
+  elif [ "$disableSkipMessage" != "true" ]; then
     echo "[UBUNTU SETUP] Flatpak is already installed. Nothing to do."
   fi
 }
@@ -336,39 +359,30 @@ function installFlatpak() {
 function installVlc() {
   if ! command -v vlc &>/dev/null; then
     echo "[UBUNTU SETUP] Installing VLC Player..."
-    installFlatpak
+    installFlatpak true
 
     if ! flatpak info org.videolan.VLC &>/dev/null; then
       flatpak install -y --user flathub org.videolan.VLC
+    else
+      echo "[UBUNTU SETUP] VLC Player is already installed via Flatpak. Nothing to do."
     fi
   else
     echo "[UBUNTU SETUP] VLC Player is already installed. Nothing to do."
   fi
 }
 
-function installSignal() {
-  if ! command -v signal-desktop &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Signal..."
-    installFlatpak
-
-    if ! flatpak info org.signal.Signal &>/dev/null; then
-      flatpak install -y --user flathub org.signal.Signal
-    fi
-  else
-    echo "[UBUNTU SETUP] Signal is already installed. Nothing to do."
-  fi
-}
-
 function installElement() {
   if ! command -v element-desktop &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Element..."
-    installFlatpak
+    installFlatpak true
 
     if ! flatpak info im.riot.Riot &>/dev/null; then
       flatpak install -y --user flathub im.riot.Riot
       # The Flatpak version requires specific permissions for file access. By default, it may not access your files.
       # To allow access to common directories like Pictures, Videos, and Documents, use:
       # flatpak override --filesystem=xdg-pictures --filesystem=xdg-videos --filesystem=xdg-documents im.riot.Riot
+    else
+      echo "[UBUNTU SETUP] Element is already installed via Flatpak. Nothing to do."
     fi
   else
     echo "[UBUNTU SETUP] Element is already installed. Nothing to do."
@@ -378,10 +392,12 @@ function installElement() {
 function installInkscape() {
   if ! command -v inkscape &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Inkscape..."
-    installFlatpak
+    installFlatpak true
 
     if ! flatpak info org.inkscape.Inkscape &>/dev/null; then
       flatpak install -y --user flathub org.inkscape.Inkscape
+    else
+      echo "[UBUNTU SETUP] Inkscape is already installed via Flatpak. Nothing to do."
     fi
   else
     echo "[UBUNTU SETUP] Inkscape is already installed. Nothing to do."
@@ -391,10 +407,12 @@ function installInkscape() {
 function installGimp() {
   if ! command -v gimp &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Gimp..."
-    installFlatpak
+    installFlatpak true
 
     if ! flatpak info org.gimp.GIMP &>/dev/null; then
       flatpak install -y --user https://flathub.org/repo/appstream/org.gimp.GIMP.flatpakref
+    else
+      echo "[UBUNTU SETUP] Gimp is already installed via Flatpak. Nothing to do."
     fi
   else
     echo "[UBUNTU SETUP] Gimp is already installed. Nothing to do."
@@ -402,13 +420,35 @@ function installGimp() {
 }
 
 function installProtonUp() {
-  installFlatpak
+  installFlatpak true
 
   if ! flatpak info net.davidotek.pupgui2 &>/dev/null; then
     echo "[UBUNTU SETUP] Installing ProtonUp-Qt..."
-    flatpak install flathub net.davidotek.pupgui2
+    flatpak install -y --user flathub net.davidotek.pupgui2
   else
     echo "[UBUNTU SETUP] ProtonUp-Qt is already installed. Nothing to do."
+  fi
+}
+
+function installMupen64Plus() {
+  installFlatpak true
+
+  if ! flatpak info net.sourceforge.m64py.M64Py &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Mupen64Plus + M64Py..."
+    flatpak install -y --user flathub net.sourceforge.m64py.M64Py
+  else
+    echo "[UBUNTU SETUP] Mupen64Plus + M64Py are already installed. Nothing to do."
+  fi
+}
+
+function installAzahar() {
+  installFlatpak true
+
+  if ! flatpak info org.azahar_emu.Azahar &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Azahar..."
+    flatpak install -y --user flathub org.azahar_emu.Azahar
+  else
+    echo "[UBUNTU SETUP] Azahar is already installed. Nothing to do."
   fi
 }
 
@@ -432,6 +472,27 @@ function installBrave() {
     sudo apt install -y brave-browser
   else
     echo "[UBUNTU SETUP] Brave is already installed. Nothing to do."
+  fi
+}
+
+function installSignal() {
+  # TODO use download function with temp files instead of wget
+  if ! command -v signal-desktop &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Signal..."
+    # install official public software signing key
+    wget -O- https://updates.signal.org/desktop/apt/keys.asc | gpg --dearmor >signal-desktop-keyring.gpg
+    cat signal-desktop-keyring.gpg | sudo tee /usr/share/keyrings/signal-desktop-keyring.gpg >/dev/null
+    rm -f signal-desktop-keyring.gpg
+
+    # add repository to our list of repositories
+    wget -O signal-desktop.sources https://updates.signal.org/static/desktop/apt/signal-desktop.sources
+    cat signal-desktop.sources | sudo tee /etc/apt/sources.list.d/signal-desktop.sources >/dev/null
+    rm -f signal-desktop.sources
+
+    sudo apt update
+    sudo apt install -y signal-desktop
+  else
+    echo "[UBUNTU SETUP] Signal is already installed. Nothing to do."
   fi
 }
 
@@ -627,14 +688,20 @@ function installGit() {
     fi
 
     echo "Creating .gitconfig for user $USER..."
-    git config --global user.name "Lena M."
-    git config --global user.email "lena.miyamoto21@gmail.com"
-    git config --global user.signingkey "$publicKey"
-    git config --global commit.gpgsign true
+    if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+      git config --global user.name "Lena M."
+      git config --global user.email "lena.miyamoto21@gmail.com"
+      git config --global user.signingkey "$publicKey"
+      git config --global commit.gpgsign true
+      git config --global gpg.format ssh
+    else
+      git config --global user.name "$USER"
+      git config --global user.email "$USER@mail.com"
+    fi
+
     git config --global core.editor "code --wait"
     git config --global core.autocrlf input
     git config --global credential.helper store
-    git config --global gpg.format ssh
 
     cat <<EOF >>~/.gitconfig
 
@@ -698,14 +765,15 @@ function installDevTools() {
   sudo apt install -y build-essential gdb lldb shfmt
 
   installGit
-  installRust
-  installJava
-  installGradle
   installNodeJs
   installVsCode
-  installAndroidSdk
 
-  #installOpenSshServer
+  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+    installRust
+    installJava
+    installGradle
+    installAndroidSdk
+  fi
 }
 
 function installGnomeShell() {
@@ -756,19 +824,31 @@ function startUbuntuSetup() {
   # install flatpak packages
   installVlc
   installGimp
-  installSignal
-  installElement
   installInkscape
+  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+    installElement
+  fi
 
   # install apt packages
-  installBrave
-  installSteam
   installTorBrowser
-  installVeracrypt
+  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+    installBrave
+    installSignal
+    installVeracrypt
+  fi
+
+  # install gaming setup
+  installSteam
+  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+    installAzahar
+    installMupen64Plus
+  fi
 
   # install fonts
   installMsFonts
-  installCustomFonts
+  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+    installCustomFonts
+  fi
 
   # install dev tools
   installDevTools
@@ -785,5 +865,51 @@ function startUbuntuSetup() {
   exit 0
 }
 
+function printHelpText() {
+  echo "Usage: ./ubuntu-setup.sh [OPTION]"
+  echo "Installs and configures Ubuntu."
+  echo
+  echo "  -h, --help                    prints this help text"
+  echo "  --basic-setup                 run only essential install and configure only the most relevant options"
+  echo "  --lenas-setup                 run full install and configure all available options (except for openssh-server)"
+  echo "  --reconfigure-vscode          deletes local VSCode config and reconfigures it from scratch"
+  echo "  --install-openssh-server      installs openssh-server for local testing"
+}
+
 ## MAIN ##
-startUbuntuSetup
+if [ $# -eq 0 ]; then
+  echo "Missing arguments."
+  echo
+  printHelpText
+  exit 1
+fi
+
+for arg in "$@"; do
+  if [ "$arg" == "-h" ] || [ "$arg" == "--help" ]; then
+    printHelpText
+    exit 0
+  elif [ "$arg" == "--basic-setup" ]; then
+    UBUNTU_SETUP_BASIC_SETUP=1
+  elif [ "$arg" == "--lenas-setup" ]; then
+    UBUNTU_SETUP_LENAS_SETUP=1
+  elif [ "$arg" == "--reconfigure-vscode" ]; then
+    UBUNTU_SETUP_RECONFIGURE_VSCODE=1
+  elif [ "$arg" == "--install-openssh-server" ]; then
+    UBUNTU_SETUP_INSTALL_OPENSSH_SERVER=1
+  else
+    echo "Unknown argument: $arg"
+    echo
+    printHelpText
+    exit 1
+  fi
+done
+
+if [ "$UBUNTU_SETUP_RECONFIGURE_VSCODE" == "1" ]; then
+  reconfigureVsCode
+fi
+if [ "$UBUNTU_SETUP_INSTALL_OPENSSH_SERVER" == "1" ]; then
+  installOpenSshServer
+fi
+if [ "$UBUNTU_SETUP_BASIC_SETUP" == "1" ] || [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+  startUbuntuSetup
+fi
