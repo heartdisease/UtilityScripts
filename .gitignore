@@ -15,3 +15,5 @@ fstab*
 wlan-pw.txt
 wordanalyzer/output.csv
 wordanalyzer/__pycache__
+
+restored/
