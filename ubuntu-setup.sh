@@ -96,6 +96,96 @@ function configureGnomeSettings() {
   #gsettings set org.gnome.desktop.peripherals.mouse speed 'double 1.0'
 }
 
+function reconfigureGit() {
+  if [ -f ~/.gitconfig ]; then
+    echo "Local git config file ~/.gitconfig aleady exists. Save existing config as backup in ~/.gitconfig.bak."
+
+    if [ -f ~/.gitconfig.bak ]; then
+      echo "Old backup file ~/.gitconfig.bak already exists. Moving ~/.gitconfig.bak to trash..."
+      gio trash -f ~/.gitconfig.bak
+    fi
+    mv ~/.gitconfig ~/.gitconfig.bak
+  fi
+
+  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ] || [ "$UBUNTU_SETUP_RECONFIGURE_LENAS_GIT" == "1" ]; then
+    local publicKey="$HOME/.ssh/id_ed25519.pub"
+
+    if ! [ -f "$publicKey" ]; then
+      echo "Error: public key file is missing ($publicKey)"
+      echo "Abort."
+      exit 1
+    fi
+
+    echo "Creating .gitconfig for Lena <3..."
+    git config --global user.name "Lena M."
+    git config --global user.email "lena.miyamoto21@gmail.com"
+    git config --global user.signingkey "$publicKey"
+    git config --global commit.gpgsign true
+    git config --global gpg.format ssh
+  else
+    echo "Creating .gitconfig for user $USER..."
+    git config --global user.name "$USER"
+    git config --global user.email "$USER@mail.com"
+  fi
+
+  git config --global core.editor "code --wait"
+  git config --global core.autocrlf input
+  git config --global credential.helper store
+
+  cat <<EOF >>~/.gitconfig
+
+### Copied from: https://blog.gitbutler.com/how-git-core-devs-configure-git ###
+
+# clearly makes git better
+[column]
+	ui = auto
+[branch]
+	sort = -committerdate
+[tag]
+	sort = version:refname
+[init]
+	defaultBranch = main
+[diff]
+	algorithm = histogram
+	colorMoved = plain
+	mnemonicPrefix = true
+	renames = true
+[push]
+	default = simple
+	autoSetupRemote = true
+	followTags = true
+[fetch]
+	prune = true
+	pruneTags = true
+	all = true
+
+# why the hell not?
+[help]
+	autocorrect = prompt
+[commit]
+	verbose = true
+[rerere]
+	enabled = true
+	autoupdate = true
+[core]
+	excludesfile = ~/.gitignore
+[rebase]
+	autoSquash = true
+	autoStash = true
+	updateRefs = true
+
+# a matter of taste (uncomment if you dare)
+[core]
+	# fsmonitor = true
+	# untrackedCache = true
+[merge]
+	# (just 'diff3' if git version < 2.3)
+	conflictstyle = zdiff3
+[pull]
+	rebase = true
+EOF
+}
+
 function reconfigureVsCode() {
   local node_24
 
@@ -129,7 +219,8 @@ function reconfigureVsCode() {
   code --install-extension sanaajani.taskrunnercode
   code --install-extension eamodio.gitlens
 
-  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ] || [ "$UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE" == "1" ]; then
+    echo "Installing Lena's VSCode extensions <3..."
     code --install-extension ms-playwright.playwright
     code --install-extension esbenp.prettier-vscode
     code --install-extension dbaeumer.vscode-eslint
@@ -142,10 +233,10 @@ function reconfigureVsCode() {
     code --install-extension dohe.godot-format
     code --install-extension geequlim.godot-tools
 
-    echo "Installing VSCode themes..."
+    echo "Installing VSCode themes for Lena <3..."
     code --install-extension atomiks.moonlight
 
-    echo "Configuring Lena's user settings for VSCode..."
+    echo "Configuring user settings for Lena's VSCode <3..."
     echo '{}' |
       jq '."editor.tabSize" = 2' |
       jq '."editor.formatOnSave" = false' |
@@ -676,85 +767,8 @@ function installRust() {
 function installGit() {
   if ! command -v git &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Git..."
-
     sudo apt install -y git fish
-
-    local publicKey="$HOME/.ssh/id_ed25519.pub"
-
-    if ! [ -f "$publicKey" ]; then
-      echo "Error: public key file is missing ($publicKey)"
-      echo "Abort."
-      exit 1
-    fi
-
-    echo "Creating .gitconfig for user $USER..."
-    if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
-      git config --global user.name "Lena M."
-      git config --global user.email "lena.miyamoto21@gmail.com"
-      git config --global user.signingkey "$publicKey"
-      git config --global commit.gpgsign true
-      git config --global gpg.format ssh
-    else
-      git config --global user.name "$USER"
-      git config --global user.email "$USER@mail.com"
-    fi
-
-    git config --global core.editor "code --wait"
-    git config --global core.autocrlf input
-    git config --global credential.helper store
-
-    cat <<EOF >>~/.gitconfig
-
-### Copied from: https://blog.gitbutler.com/how-git-core-devs-configure-git ###
-
-# clearly makes git better
-[column]
-	ui = auto
-[branch]
-	sort = -committerdate
-[tag]
-	sort = version:refname
-[init]
-	defaultBranch = main
-[diff]
-	algorithm = histogram
-	colorMoved = plain
-	mnemonicPrefix = true
-	renames = true
-[push]
-	default = simple
-	autoSetupRemote = true
-	followTags = true
-[fetch]
-	prune = true
-	pruneTags = true
-	all = true
-
-# why the hell not?
-[help]
-	autocorrect = prompt
-[commit]
-	verbose = true
-[rerere]
-	enabled = true
-	autoupdate = true
-[core]
-	excludesfile = ~/.gitignore
-[rebase]
-	autoSquash = true
-	autoStash = true
-	updateRefs = true
-
-# a matter of taste (uncomment if you dare)
-[core]
-	# fsmonitor = true
-	# untrackedCache = true
-[merge]
-	# (just 'diff3' if git version < 2.3)
-	conflictstyle = zdiff3
-[pull]
-	rebase = true
-EOF
+    reconfigureGit
   else
     echo "[UBUNTU SETUP] Git is already installed. Nothing to do."
   fi
@@ -804,6 +818,12 @@ function startUbuntuSetup() {
     exit 1
   else
     echo "[UBUNTU SETUP] Running on $(lsb_release -sd 2>/dev/null)."
+  fi
+
+  if [ "$UBUNTU_SETUP_BASIC_SETUP" == "1" ]; then
+    echo "[UBUNTU SETUP] Starting basic setup for user $USER..."
+  elif [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+    echo "[UBUNTU SETUP] Starting setup for Lena <3..."
   fi
 
   echo "[UBUNTU SETUP] Updating packages..."
@@ -872,7 +892,10 @@ function printHelpText() {
   echo "  -h, --help                    prints this help text"
   echo "  --basic-setup                 run only essential install and configure only the most relevant options"
   echo "  --lenas-setup                 run full install and configure all available options (except for openssh-server)"
+  echo "  --reconfigure-git             deletes local git config and reconfigures it from scratch"
+  echo "  --reconfigure-lenas-git       same as --reconfigure-git, but with private extra settings for Lena <3"
   echo "  --reconfigure-vscode          deletes local VSCode config and reconfigures it from scratch"
+  echo "  --reconfigure-lenas-vscode    same as --reconfigure-vscode, but with private extra settings for Lena <3"
   echo "  --install-openssh-server      installs openssh-server for local testing"
 }
 
@@ -889,11 +912,25 @@ for arg in "$@"; do
     printHelpText
     exit 0
   elif [ "$arg" == "--basic-setup" ]; then
+    if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+      echo "Error: option --basic-setup is mutually exclusive with option --lenas-setup"
+      exit 1
+    fi
     UBUNTU_SETUP_BASIC_SETUP=1
   elif [ "$arg" == "--lenas-setup" ]; then
+    if [ "$UBUNTU_SETUP_BASIC_SETUP" == "1" ]; then
+      echo "Error: option --lenas-setup is mutually exclusive with option --basic-setup"
+      exit 1
+    fi
     UBUNTU_SETUP_LENAS_SETUP=1
+  elif [ "$arg" == "--reconfigure-git" ]; then
+    UBUNTU_SETUP_RECONFIGURE_GIT=1
+  elif [ "$arg" == "--reconfigure-lenas-git" ]; then
+    UBUNTU_SETUP_RECONFIGURE_LENAS_GIT=1
   elif [ "$arg" == "--reconfigure-vscode" ]; then
     UBUNTU_SETUP_RECONFIGURE_VSCODE=1
+  elif [ "$arg" == "--reconfigure-lenas-vscode" ]; then
+    UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE=1
   elif [ "$arg" == "--install-openssh-server" ]; then
     UBUNTU_SETUP_INSTALL_OPENSSH_SERVER=1
   else
@@ -904,7 +941,10 @@ for arg in "$@"; do
   fi
 done
 
-if [ "$UBUNTU_SETUP_RECONFIGURE_VSCODE" == "1" ]; then
+if [ "$UBUNTU_SETUP_RECONFIGURE_GIT" == "1" ] || [ "$UBUNTU_SETUP_RECONFIGURE_LENAS_GIT" == "1" ]; then
+  reconfigureGit
+fi
+if [ "$UBUNTU_SETUP_RECONFIGURE_VSCODE" == "1" ] || [ "$UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE" == "1" ]; then
   reconfigureVsCode
 fi
 if [ "$UBUNTU_SETUP_INSTALL_OPENSSH_SERVER" == "1" ]; then
