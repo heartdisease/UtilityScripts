@@ -797,29 +797,6 @@ function installGnomeShell() {
 }
 
 function startUbuntuSetup() {
-  if [[ -n "$BASH_VERSION" ]]; then
-    echo "[UBUNTU SETUP] Script is running in Bash ($BASH_VERSION)."
-  else
-    echo "[UBUNTU SETUP] Script is not running in Bash. Abort."
-    exit 1
-  fi
-  if [ "$USERNAME" == "root" ]; then
-    echo "[UBUNTU SETUP] This script is not intended to be run as root! Run as local user instead! Abort."
-    exit 1
-  else
-    echo "[UBUNTU SETUP] Running as user '$USERNAME'."
-  fi
-  if [ "$(lsb_release -si 2>/dev/null)" != "Ubuntu" ]; then
-    echo "[UBUNTU SETUP] Your linux distribution $(lsb_release -si 2>/dev/null) is not supported! Abort."
-    exit 1
-  fi
-  if [ "$(lsb_release -sr 2>/dev/null)" != "24.04" ]; then
-    echo "[UBUNTU SETUP] Your Ubuntu version is not supported $(lsb_release -sr 2>/dev/null)! Abort."
-    exit 1
-  else
-    echo "[UBUNTU SETUP] Running on $(lsb_release -sd 2>/dev/null)."
-  fi
-
   if [ "$UBUNTU_SETUP_BASIC_SETUP" == "1" ]; then
     echo "[UBUNTU SETUP] Starting basic setup for user $USER..."
   elif [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
@@ -940,6 +917,35 @@ for arg in "$@"; do
     exit 1
   fi
 done
+
+if [[ -n "$BASH_VERSION" ]]; then
+  echo "[UBUNTU SETUP] Script is running in Bash ($BASH_VERSION)."
+else
+  echo "[UBUNTU SETUP] Script is not running in Bash. Abort."
+  exit 1
+fi
+if [ "$USERNAME" == "root" ]; then
+  echo "[UBUNTU SETUP] This script is not intended to be run as root! Run as local user instead! Abort."
+  exit 1
+else
+  echo "[UBUNTU SETUP] Running as user '$USERNAME'."
+fi
+if [ "$(lsb_release -si 2>/dev/null)" != "Ubuntu" ]; then
+  echo "[UBUNTU SETUP] Your linux distribution $(lsb_release -si 2>/dev/null) is not supported! Abort."
+  exit 1
+fi
+if [ "$(lsb_release -sr 2>/dev/null)" != "24.04" ]; then
+  echo "[UBUNTU SETUP] Your Ubuntu version is not supported $(lsb_release -sr 2>/dev/null)! Abort."
+  exit 1
+else
+  echo "[UBUNTU SETUP] Running on $(lsb_release -sd 2>/dev/null)."
+fi
+
+if [ -f ~/.nvm/nvm.sh ]; then
+  # sourcing nvm manually since it is for whatever reason not available by default in bash scripts
+  # shellcheck disable=SC1090
+  source ~/.nvm/nvm.sh
+fi
 
 if [ "$UBUNTU_SETUP_RECONFIGURE_GIT" == "1" ] || [ "$UBUNTU_SETUP_RECONFIGURE_LENAS_GIT" == "1" ]; then
   reconfigureGit
