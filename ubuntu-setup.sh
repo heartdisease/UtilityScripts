@@ -1,9 +1,12 @@
 #!/bin/bash
+IFS=$'\n\t'
+set -euo pipefail
+
 function downloadAndVerify() {
-  local url=$1
-  local fileName=$2
-  local controlHash=$3
-  local useTempFile=$4
+  local url=${1:-}
+  local fileName=${2:-}
+  local controlHash=${3:-}
+  local useTempFile=${4:-}
 
   local downloadFile
   local fileHash
@@ -15,7 +18,7 @@ function downloadAndVerify() {
     sudo apt install -y rhash
   fi
 
-  if [ "$useTempFile" == "true" ]; then
+  if [[ "$useTempFile" == "true" ]]; then
     downloadFile=$(mktemp --suffix=".$fileName")
   else
     downloadFile="$HOME/Downloads/$fileName"
@@ -43,13 +46,13 @@ function downloadAndVerify() {
 }
 
 function downloadAndExecute() {
-  local url=$1
-  local fileName=$2
-  local controlHash=$3
-  local runAsRoot=$4
+  local url=${1:-}
+  local fileName=${2:-}
+  local controlHash=${3:-}
+  local runAsRoot=${4:-}
 
-  downloadAndVerify "$1" "$2" "$3"
-  local tempFile=$UBUNTU_SETUP_LAST_DOWNLOADED_FILE
+  downloadAndVerify "$url" "$fileName" "$controlHash"
+  local tempFile=${UBUNTU_SETUP_LAST_DOWNLOADED_FILE:-}
 
   echo "Making file executable..."
   chmod +x "$tempFile"
@@ -58,33 +61,66 @@ function downloadAndExecute() {
   if [[ "$runAsRoot" == "true" ]]; then
     sudo "$tempFile"
   else
-    # shellcheck disable=SC1090
-    . "$tempFile"
+    bash "$tempFile"
+  fi
+}
+
+function appendUniqueLineToBashrc() {
+  local line=${1:-}
+  local bashrc="$HOME/.bashrc"
+
+  touch "$bashrc"
+  if ! grep -Fqx "$line" "$bashrc"; then
+    printf '%s\n' "$line" >>"$bashrc"
+  fi
+}
+
+function gsettingsSchemaExists() {
+  local schema=${1:-}
+
+  gsettings list-schemas | grep -Fxq "$schema"
+}
+
+function setGsettingIfSchemaExists() {
+  local schema=${1:-}
+  local key=${2:-}
+  local value=${3:-}
+
+  if gsettingsSchemaExists "$schema"; then
+    gsettings set "$schema" "$key" "$value"
+  else
+    echo "[UBUNTU SETUP] Skip missing gsettings schema: $schema"
   fi
 }
 
 function configureGnomeSettings() {
+  if ! command -v gsettings &>/dev/null; then
+    echo "[UBUNTU SETUP] Unexpected error: gsettings is not present!"
+    echo "[UBUNTU SETUP] Abort."
+    exit 1
+  fi
+
   echo "[UBUNTU SETUP] Adjust GNOME user settings for Nautilus..."
-  gsettings set org.gnome.nautilus.preferences default-sort-order 'type'
-  gsettings set org.gnome.nautilus.preferences show-create-link true
+  setGsettingIfSchemaExists org.gnome.nautilus.preferences default-sort-order 'type'
+  setGsettingIfSchemaExists org.gnome.nautilus.preferences show-create-link true
 
   echo "[UBUNTU SETUP] Adjust GNOME user settings for Gedit..."
-  gsettings set org.gnome.gedit.preferences.editor display-line-numbers true
-  gsettings set org.gnome.gedit.preferences.editor highlight-current-line true
-  gsettings set org.gnome.gedit.preferences.editor bracket-matching true
-  gsettings set org.gnome.gedit.preferences.editor scheme 'oblivion'
-  gsettings set org.gnome.gedit.preferences.editor auto-indent true
-  gsettings set org.gnome.gedit.preferences.editor insert-spaces true
-  gsettings set org.gnome.gedit.preferences.editor tabs-size 'uint32 2'
+  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor display-line-numbers true
+  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor highlight-current-line true
+  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor bracket-matching true
+  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor scheme 'oblivion'
+  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor auto-indent true
+  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor insert-spaces true
+  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor tabs-size 'uint32 2'
 
   echo "[UBUNTU SETUP] Adjust GNOME user settings to disable new tiling feature..."
-  gsettings set org.gnome.mutter.keybindings toggle-tiled-left "['<Super>Left']"
-  gsettings set org.gnome.mutter.keybindings toggle-tiled-right "['<Super>Right']"
+  setGsettingIfSchemaExists org.gnome.mutter.keybindings toggle-tiled-left "['<Super>Left']"
+  setGsettingIfSchemaExists org.gnome.mutter.keybindings toggle-tiled-right "['<Super>Right']"
 
   echo "[UBUNTU SETUP] Adjust GNOME user settings to disable default shortcuts that interfere with VSCode..."
-  gsettings set org.gnome.desktop.wm.keybindings toggle-shaded "[]"
-  gsettings set org.gnome.desktop.wm.keybindings begin-move "[]"
-  gsettings set org.gnome.desktop.wm.keybindings panel-main-menu "[]"
+  setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings toggle-shaded "[]"
+  setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings begin-move "[]"
+  setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings panel-main-menu "[]"
 
   #gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-right "[]"
   #gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-left "[]"
@@ -97,8 +133,19 @@ function configureGnomeSettings() {
 }
 
 function reconfigureGit() {
+  if ! [ -f /usr/share/doc/git/contrib/credential/libsecret/git-credential-libsecret ]; then
+    sudo apt install -y make gcc libsecret-1-0 libsecret-1-dev libglib2.0-dev
+    sudo make -C /usr/share/doc/git/contrib/credential/libsecret
+
+    if ! [ -f /usr/share/doc/git/contrib/credential/libsecret/git-credential-libsecret ]; then
+      echo "Unexpected error: failed to build git-credential-libsecret!"
+      echo "Abort."
+      exit 1
+    fi
+  fi
+
   if [ -f ~/.gitconfig ]; then
-    echo "Local git config file ~/.gitconfig aleady exists. Save existing config as backup in ~/.gitconfig.bak."
+    echo "Local git config file ~/.gitconfig already exists. Save existing config as backup in ~/.gitconfig.bak."
 
     if [ -f ~/.gitconfig.bak ]; then
       echo "Old backup file ~/.gitconfig.bak already exists. Moving ~/.gitconfig.bak to trash..."
@@ -107,7 +154,7 @@ function reconfigureGit() {
     mv ~/.gitconfig ~/.gitconfig.bak
   fi
 
-  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ] || [ "$UBUNTU_SETUP_RECONFIGURE_LENAS_GIT" == "1" ]; then
+  if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]] || [[ "${UBUNTU_SETUP_RECONFIGURE_LENAS_GIT:-}" == "1" ]]; then
     local publicKey="$HOME/.ssh/id_ed25519.pub"
 
     if ! [ -f "$publicKey" ]; then
@@ -123,14 +170,14 @@ function reconfigureGit() {
     git config --global commit.gpgsign true
     git config --global gpg.format ssh
   else
-    echo "Creating .gitconfig for user $USER..."
-    git config --global user.name "$USER"
-    git config --global user.email "$USER@mail.com"
+    echo "Creating .gitconfig for user ${UBUNTU_SETUP_USERNAME:-}..."
+    git config --global user.name "${UBUNTU_SETUP_USERNAME:-}"
+    git config --global user.email "${UBUNTU_SETUP_USERNAME:-}@mail.com"
   fi
 
   git config --global core.editor "code --wait"
   git config --global core.autocrlf input
-  git config --global credential.helper store
+  git config --global credential.helper /usr/share/doc/git/contrib/credential/libsecret/git-credential-libsecret
 
   cat <<EOF >>~/.gitconfig
 
@@ -211,6 +258,11 @@ function reconfigureVsCode() {
   fi
 
   node_24=$(nvm which 24)
+  if [ -z "$node_24" ] || ! [ -x "$node_24" ]; then
+    echo "Unexpected error: could not detect Node.js 24 executable!"
+    echo "Abort."
+    exit 1
+  fi
 
   echo "Installing commonly used VSCode extensions..."
   code --install-extension vscode-icons-team.vscode-icons
@@ -219,7 +271,7 @@ function reconfigureVsCode() {
   code --install-extension sanaajani.taskrunnercode
   code --install-extension eamodio.gitlens
 
-  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ] || [ "$UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE" == "1" ]; then
+  if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]] || [[ "${UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE:-}" == "1" ]]; then
     echo "Installing Lena's VSCode extensions <3..."
     code --install-extension ms-playwright.playwright
     code --install-extension esbenp.prettier-vscode
@@ -281,12 +333,12 @@ function reconfigureVsCode() {
 
 function installCommandlineBasics() {
   echo "[UBUNTU SETUP] Install basic command line utilities..."
-  sudo apt install -y fish plocate rhash curl pwgen optipng rar p7zip-full pdftk-java mesa-utils apt-transport-https
+  sudo apt install -y fish plocate rhash curl pwgen optipng rar p7zip-full pdftk-java libsecret-tools mesa-utils apt-transport-https
 }
 
 function installSystemUtils() {
   echo "[UBUNTU SETUP] Install basic system utilities..."
-  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+  if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     sudo apt install -y keepass2
   fi
   sudo apt install -y gparted usb-creator-gtk
@@ -317,21 +369,21 @@ function installMsFonts() {
 }
 
 function installCustomFont() {
-  local fontName=$1
-  local fontType=$2
-  local fontDirectoryName=$3
-  local url=$4
-  local fileName=$5
-  local controlHash=$6
+  local fontName=${1:-}
+  local fontType=${2:-}
+  local fontDirectoryName=${3:-}
+  local url=${4:-}
+  local fileName=${5:-}
+  local controlHash=${6:-}
 
   local fontDirectory="/usr/share/fonts/$fontType/$fontDirectoryName"
 
   if ! [ -d "$fontDirectory" ]; then
     local fontSuffix
 
-    if [ "$fontType" == "opentype" ]; then
+    if [[ "$fontType" == "opentype" ]]; then
       fontSuffix="*.otf"
-    elif [ "$fontType" == "truetype" ]; then
+    elif [[ "$fontType" == "truetype" ]]; then
       fontSuffix="*.ttf"
     else
       echo "Invalid font type: $fontType"
@@ -341,7 +393,7 @@ function installCustomFont() {
     echo "[UBUNTU SETUP] Downloading and installing $fontType font '$fontName'..."
     downloadAndVerify "$url" "$fileName" "$controlHash"
     sudo mkdir "$fontDirectory"
-    sudo unzip -d "$fontDirectory" -j "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE" "$fontSuffix"
+    sudo unzip -d "$fontDirectory" -j "${UBUNTU_SETUP_LAST_DOWNLOADED_FILE:-}" "$fontSuffix"
 
     UBUNTU_SETUP_CUSTOM_FONT_INSTALLED=1
   else
@@ -388,7 +440,7 @@ function installCustomFonts() {
     'magic_stary.zip' \
     '456e4c750ba8736dcd53597eed965ac9c24c5d8db34503fb698fca1a90594da993ace44a0fb8ac7a79c5f562faf1394370e8242db452b44810c767f6c6aa9433'
 
-  if [ "$UBUNTU_SETUP_CUSTOM_FONT_INSTALLED" == "1" ]; then
+  if [[ "${UBUNTU_SETUP_CUSTOM_FONT_INSTALLED:-}" == "1" ]]; then
     sudo fc-cache -fv
   fi
 }
@@ -431,18 +483,18 @@ function installVsCode() {
 }
 
 function installFlatpak() {
-  local disableSkipMessage=$1
+  local disableSkipMessage=${1:-}
 
   if ! command -v flatpak &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Flatpak..."
     sudo apt install -y flatpak gnome-software-plugin-flatpak
 
-    flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+    sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
     flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
     flatpak update
     flatpak update --appstream
-  elif [ "$disableSkipMessage" != "true" ]; then
+  elif [[ "$disableSkipMessage" != "true" ]]; then
     echo "[UBUNTU SETUP] Flatpak is already installed. Nothing to do."
   fi
 }
@@ -454,6 +506,8 @@ function installVlc() {
 
     if ! flatpak info org.videolan.VLC &>/dev/null; then
       flatpak install -y --user flathub org.videolan.VLC
+      flatpak run --user org.videolan.VLC &
+      disown
     else
       echo "[UBUNTU SETUP] VLC Player is already installed via Flatpak. Nothing to do."
     fi
@@ -469,6 +523,9 @@ function installElement() {
 
     if ! flatpak info im.riot.Riot &>/dev/null; then
       flatpak install -y --user flathub im.riot.Riot
+      flatpak run --user flathub im.riot.Riot &
+      disown
+
       # The Flatpak version requires specific permissions for file access. By default, it may not access your files.
       # To allow access to common directories like Pictures, Videos, and Documents, use:
       # flatpak override --filesystem=xdg-pictures --filesystem=xdg-videos --filesystem=xdg-documents im.riot.Riot
@@ -487,6 +544,8 @@ function installInkscape() {
 
     if ! flatpak info org.inkscape.Inkscape &>/dev/null; then
       flatpak install -y --user flathub org.inkscape.Inkscape
+      flatpak run --user org.inkscape.Inkscape &
+      disown
     else
       echo "[UBUNTU SETUP] Inkscape is already installed via Flatpak. Nothing to do."
     fi
@@ -502,6 +561,8 @@ function installGimp() {
 
     if ! flatpak info org.gimp.GIMP &>/dev/null; then
       flatpak install -y --user https://flathub.org/repo/appstream/org.gimp.GIMP.flatpakref
+      flatpak run --user org.gimp.GIMP &
+      disown
     else
       echo "[UBUNTU SETUP] Gimp is already installed via Flatpak. Nothing to do."
     fi
@@ -516,6 +577,8 @@ function installProtonUp() {
   if ! flatpak info net.davidotek.pupgui2 &>/dev/null; then
     echo "[UBUNTU SETUP] Installing ProtonUp-Qt..."
     flatpak install -y --user flathub net.davidotek.pupgui2
+    flatpak run --user net.davidotek.pupgui2 &
+    disown
   else
     echo "[UBUNTU SETUP] ProtonUp-Qt is already installed. Nothing to do."
   fi
@@ -527,6 +590,8 @@ function installMupen64Plus() {
   if ! flatpak info net.sourceforge.m64py.M64Py &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Mupen64Plus + M64Py..."
     flatpak install -y --user flathub net.sourceforge.m64py.M64Py
+    flatpak run --user net.sourceforge.m64py.M64Py &
+    disown
   else
     echo "[UBUNTU SETUP] Mupen64Plus + M64Py are already installed. Nothing to do."
   fi
@@ -538,6 +603,8 @@ function installAzahar() {
   if ! flatpak info org.azahar_emu.Azahar &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Azahar..."
     flatpak install -y --user flathub org.azahar_emu.Azahar
+    flatpak run --user org.azahar_emu.Azahar &
+    disown
   else
     echo "[UBUNTU SETUP] Azahar is already installed. Nothing to do."
   fi
@@ -567,18 +634,16 @@ function installBrave() {
 }
 
 function installSignal() {
-  # TODO use download function with temp files instead of wget
   if ! command -v signal-desktop &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Signal..."
+
     # install official public software signing key
-    wget -O- https://updates.signal.org/desktop/apt/keys.asc | gpg --dearmor >signal-desktop-keyring.gpg
-    cat signal-desktop-keyring.gpg | sudo tee /usr/share/keyrings/signal-desktop-keyring.gpg >/dev/null
-    rm -f signal-desktop-keyring.gpg
+    curl -fsSL https://updates.signal.org/desktop/apt/keys.asc | gpg --dearmor >"signal-desktop-keyring.gpg"
+    sudo install -m 0644 "signal-desktop-keyring.gpg" /usr/share/keyrings/signal-desktop-keyring.gpg
 
     # add repository to our list of repositories
-    wget -O signal-desktop.sources https://updates.signal.org/static/desktop/apt/signal-desktop.sources
-    cat signal-desktop.sources | sudo tee /etc/apt/sources.list.d/signal-desktop.sources >/dev/null
-    rm -f signal-desktop.sources
+    curl -fsSL https://updates.signal.org/static/desktop/apt/signal-desktop.sources -o "signal-desktop.sources"
+    sudo install -m 0644 "signal-desktop.sources" /etc/apt/sources.list.d/signal-desktop.sources
 
     sudo apt update
     sudo apt install -y signal-desktop
@@ -620,12 +685,10 @@ function installJava() {
     sudo apt install -y openjdk-17-jdk
 
     echo "Adding JAVA_HOME to ~/.bashrc..."
-    echo >>~/.bashrc
+    export JAVA_HOME
+    JAVA_HOME=$(readlink -f /usr/bin/javac | sed 's:/bin/javac::')
     # shellcheck disable=SC2016
-    echo 'export JAVA_HOME=$(readlink -f /usr/bin/javac | sed "s:/bin/javac::")' | tee -a ~/.bashrc
-
-    # shellcheck disable=SC1090
-    source ~/.bashrc
+    appendUniqueLineToBashrc 'export JAVA_HOME=$(readlink -f /usr/bin/javac | sed "s:/bin/javac::")'
   else
     echo "[UBUNTU SETUP] Java is already installed. Nothing to do."
   fi
@@ -637,12 +700,10 @@ function installGradle() {
     sudo apt install -y gradle
 
     echo "Adding GRADLE_HOME to ~/.bashrc..."
-    echo >>~/.bashrc
+    export GRADLE_HOME
+    GRADLE_HOME=$(readlink -f /usr/bin/gradle | sed 's:/bin/gradle::')
     # shellcheck disable=SC2016
-    echo 'export GRADLE_HOME=$(readlink -f /usr/bin/gradle | sed "s:/bin/gradle::")' | tee -a ~/.bashrc
-
-    # shellcheck disable=SC1090
-    source ~/.bashrc
+    appendUniqueLineToBashrc 'export GRADLE_HOME=$(readlink -f /usr/bin/gradle | sed "s:/bin/gradle::")'
   else
     echo "[UBUNTU SETUP] Gradle is already installed. Nothing to do."
   fi
@@ -657,7 +718,7 @@ function installAndroidSdk() {
     echo "[UBUNTU SETUP] Downloading and installing cmdline-tools (Android SDK)..."
     downloadAndVerify "https://dl.google.com/android/repository/commandlinetools-linux-14742923_latest.zip" "commandlinetools-linux-14742923_latest.zip" "b65e830d7655fb39cc9eee669806977f462c49375807ef2c6487fabcc9afdbc210465ce6a1e2429ff95c74ca519d1239daf9a403c30b8d0bdb7a0962af656c8e"
     mkdir -p ~/.local/android/sdk/.temp
-    unzip "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE" -d ~/.local/android/sdk/.temp
+    unzip "${UBUNTU_SETUP_LAST_DOWNLOADED_FILE:-}" -d ~/.local/android/sdk/.temp
     mkdir -p ~/.local/android/sdk/cmdline-tools/latest
     mv ~/.local/android/sdk/.temp/cmdline-tools/* ~/.local/android/sdk/cmdline-tools/latest
     rm -rf ~/.local/android/sdk/.temp
@@ -665,19 +726,19 @@ function installAndroidSdk() {
     sudo apt install -y libxcb-cursor0
 
     echo "Adding ANDROID_HOME to ~/.bashrc..."
-    # shellcheck disable=SC2016
-    echo 'export ANDROID_HOME=$HOME/.local/android/sdk' | tee -a ~/.bashrc
-    # shellcheck disable=SC2016
-    echo 'export ANDROID_SDK_ROOT=$ANDROID_HOME' | tee -a ~/.bashrc
-    # shellcheck disable=SC2016
-    echo 'export ANDROID_AVD_HOME=$HOME/.local/android/avd' | tee -a ~/.bashrc
-    echo >>~/.bashrc
-    # shellcheck disable=SC2016
-    echo 'export PATH=$PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin' | tee -a ~/.bashrc
-    echo >>~/.bashrc
+    export ANDROID_HOME="$HOME/.local/android/sdk"
+    export ANDROID_SDK_ROOT="$ANDROID_HOME"
+    export ANDROID_AVD_HOME="$HOME/.local/android/avd"
+    export PATH="$PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin"
 
-    # shellcheck disable=SC1090
-    source ~/.bashrc
+    # shellcheck disable=SC2016
+    appendUniqueLineToBashrc 'export ANDROID_HOME=$HOME/.local/android/sdk'
+    # shellcheck disable=SC2016
+    appendUniqueLineToBashrc 'export ANDROID_SDK_ROOT=$ANDROID_HOME'
+    # shellcheck disable=SC2016
+    appendUniqueLineToBashrc 'export ANDROID_AVD_HOME=$HOME/.local/android/avd'
+    # shellcheck disable=SC2016
+    appendUniqueLineToBashrc 'export PATH=$PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin'
 
     echo 'y' | sdkmanager "emulator" "platform-tools" "build-tools;36.0.0" "platforms;android-36" "system-images;android-36;google_apis;x86_64"
     echo 'no' | avdmanager create avd --force --name Pixel10_API36 --package "system-images;android-36;google_apis;x86_64"
@@ -688,37 +749,42 @@ function installAndroidSdk() {
 }
 
 function installOpenSshServer() {
-  if ! [ -d /home/sftpuser ]; then
-    echo "[UBUNTU SETUP] Installing OpenSSH Server..."
-    sudo apt install -y openssh-server
+  local sftpUser=sftpuser
+  local sftpHome="/home/$sftpUser"
+  local sshdConfigDropIn=/etc/ssh/sshd_config.d/ubuntu-setup-sftpuser.conf
 
-    # Create an SFTP-only user for restricted access
-    sudo useradd -m -d /home/sftpuser -s /usr/sbin/nologin sftpuser
-    sudo passwd sftpuser
+  echo "[UBUNTU SETUP] Installing OpenSSH Server..."
+  sudo apt install -y openssh-server
 
-    # Configure chroot jail (recommended for security)
-    echo "
+  if ! id "$sftpUser" &>/dev/null; then
+    echo "[UBUNTU SETUP] Creating SFTP-only user '$sftpUser'..."
+    sudo useradd -m -d "$sftpHome" -s /usr/sbin/nologin "$sftpUser"
+    sudo passwd "$sftpUser"
+  else
+    echo "[UBUNTU SETUP] SFTP-only user '$sftpUser' already exists."
+  fi
+
+  # Configure chroot jail via a managed drop-in file.
+  sudo mkdir -p /etc/ssh/sshd_config.d
+  cat <<EOF | sudo tee "$sshdConfigDropIn" >/dev/null
 Match User sftpuser
     ChrootDirectory /home/sftpuser
     ForceCommand internal-sftp
     AllowTcpForwarding no
     X11Forwarding no
-" | sudo tee -a /etc/ssh/sshd_config
+EOF
 
-    # restart SSH
-    sudo systemctl restart ssh
+  # Set proper permissions for the chroot and writable upload directory.
+  sudo mkdir -p "$sftpHome"
+  sudo chown root:root "$sftpHome"
+  sudo chmod 755 "$sftpHome"
+  sudo mkdir -p "$sftpHome/uploads"
+  sudo chown "$sftpUser:$sftpUser" "$sftpHome/uploads"
 
-    # Set proper permissions
-    sudo chown root:root /home/sftpuser
-    sudo chmod 755 /home/sftpuser
-    sudo mkdir /home/sftpuser/uploads
-    sudo chown sftpuser:sftpuser /home/sftpuser/uploads
+  sudo systemctl restart ssh
 
-    #Test the connection from a client
-    #sftp -v sftpuser@localhost
-  else
-    echo "[UBUNTU SETUP] OpenSSH Server is already installed. Nothing to do."
-  fi
+  # Test the connection from a client:
+  # sftp -v sftpuser@localhost
 }
 
 function installVeracrypt() {
@@ -736,14 +802,22 @@ function installNodeJs() {
   if ! [ -f ~/.nvm/nvm.sh ]; then
     echo "[UBUNTU SETUP] Installing Node Version Manager (nvm)..."
     downloadAndExecute https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh nvm-install.sh a8e082d8d1a9b61a09e5d3e1902d2930e5b1b84a86f9777c7d2eb50ea204c0141f6a97c54a860bc3282e7b000f1c669c755f5e0db7bd6d492072744c302c0a21
+  else
+    echo "[UBUNTU SETUP] Node Version Manager (nvm) is already installed."
+  fi
 
-    echo "[UBUNTU SETUP] Installing the latest LTS version of Node.js..."
+  if ! command -v nvm &>/dev/null; then
     # shellcheck disable=SC1090
     source ~/.nvm/nvm.sh
-    nvm install --lts
-    nvm use --lts
+  fi
+
+  if [[ "$(nvm -v)" == "v24."* ]]; then
+    echo "[UBUNTU SETUP] Installing and activating Node.js 24..."
+    nvm install 24
+    nvm alias default 24
+    nvm use 24
   else
-    echo "[UBUNTU SETUP] Node Version Manager (nvm) is already installed. Nothing to do."
+    echo "[UBUNTU SETUP] Node.js 24 is already installed."
   fi
 }
 
@@ -752,8 +826,8 @@ function installRust() {
     echo "[UBUNTU SETUP] Installing Rustup..."
     sudo apt install -y curl
 
-    # TODO send new line on stdio to skip installer prompt
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    # TODO use downloadAndExecute with checksum instead
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     # shellcheck disable=SC1090
     source ~/.cargo/env
 
@@ -782,7 +856,7 @@ function installDevTools() {
   installNodeJs
   installVsCode
 
-  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+  if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     installRust
     installJava
     installGradle
@@ -797,9 +871,9 @@ function installGnomeShell() {
 }
 
 function startUbuntuSetup() {
-  if [ "$UBUNTU_SETUP_BASIC_SETUP" == "1" ]; then
-    echo "[UBUNTU SETUP] Starting basic setup for user $USER..."
-  elif [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+  if [[ "${UBUNTU_SETUP_BASIC_SETUP:-}" == "1" ]]; then
+    echo "[UBUNTU SETUP] Starting basic setup for user ${UBUNTU_SETUP_USERNAME:-}..."
+  elif [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     echo "[UBUNTU SETUP] Starting setup for Lena <3..."
   fi
 
@@ -822,13 +896,13 @@ function startUbuntuSetup() {
   installVlc
   installGimp
   installInkscape
-  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+  if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     installElement
   fi
 
   # install apt packages
   installTorBrowser
-  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+  if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     installBrave
     installSignal
     installVeracrypt
@@ -836,14 +910,14 @@ function startUbuntuSetup() {
 
   # install gaming setup
   installSteam
-  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+  if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     installAzahar
     installMupen64Plus
   fi
 
   # install fonts
   installMsFonts
-  if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+  if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     installCustomFonts
   fi
 
@@ -885,30 +959,30 @@ if [ $# -eq 0 ]; then
 fi
 
 for arg in "$@"; do
-  if [ "$arg" == "-h" ] || [ "$arg" == "--help" ]; then
+  if [[ "$arg" == "-h" ]] || [[ "$arg" == "--help" ]]; then
     printHelpText
     exit 0
-  elif [ "$arg" == "--basic-setup" ]; then
-    if [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+  elif [[ "$arg" == "--basic-setup" ]]; then
+    if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
       echo "Error: option --basic-setup is mutually exclusive with option --lenas-setup"
       exit 1
     fi
     UBUNTU_SETUP_BASIC_SETUP=1
-  elif [ "$arg" == "--lenas-setup" ]; then
-    if [ "$UBUNTU_SETUP_BASIC_SETUP" == "1" ]; then
+  elif [[ "$arg" == "--lenas-setup" ]]; then
+    if [[ "${UBUNTU_SETUP_BASIC_SETUP:-}" == "1" ]]; then
       echo "Error: option --lenas-setup is mutually exclusive with option --basic-setup"
       exit 1
     fi
     UBUNTU_SETUP_LENAS_SETUP=1
-  elif [ "$arg" == "--reconfigure-git" ]; then
+  elif [[ "$arg" == "--reconfigure-git" ]]; then
     UBUNTU_SETUP_RECONFIGURE_GIT=1
-  elif [ "$arg" == "--reconfigure-lenas-git" ]; then
+  elif [[ "$arg" == "--reconfigure-lenas-git" ]]; then
     UBUNTU_SETUP_RECONFIGURE_LENAS_GIT=1
-  elif [ "$arg" == "--reconfigure-vscode" ]; then
+  elif [[ "$arg" == "--reconfigure-vscode" ]]; then
     UBUNTU_SETUP_RECONFIGURE_VSCODE=1
-  elif [ "$arg" == "--reconfigure-lenas-vscode" ]; then
+  elif [[ "$arg" == "--reconfigure-lenas-vscode" ]]; then
     UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE=1
-  elif [ "$arg" == "--install-openssh-server" ]; then
+  elif [[ "$arg" == "--install-openssh-server" ]]; then
     UBUNTU_SETUP_INSTALL_OPENSSH_SERVER=1
   else
     echo "Unknown argument: $arg"
@@ -918,44 +992,46 @@ for arg in "$@"; do
   fi
 done
 
+UBUNTU_SETUP_USERNAME=$(id -un)
+
 if [[ -n "$BASH_VERSION" ]]; then
   echo "[UBUNTU SETUP] Script is running in Bash ($BASH_VERSION)."
 else
   echo "[UBUNTU SETUP] Script is not running in Bash. Abort."
   exit 1
 fi
-if [ "$USERNAME" == "root" ]; then
+if [ $EUID -eq 0 ]; then
   echo "[UBUNTU SETUP] This script is not intended to be run as root! Run as local user instead! Abort."
   exit 1
 else
-  echo "[UBUNTU SETUP] Running as user '$USERNAME'."
+  echo "[UBUNTU SETUP] Running as user '${UBUNTU_SETUP_USERNAME:-}'."
 fi
-if [ "$(lsb_release -si 2>/dev/null)" != "Ubuntu" ]; then
+if [[ "$(lsb_release -si 2>/dev/null)" != "Ubuntu" ]]; then
   echo "[UBUNTU SETUP] Your linux distribution $(lsb_release -si 2>/dev/null) is not supported! Abort."
   exit 1
 fi
-if [ "$(lsb_release -sr 2>/dev/null)" != "24.04" ]; then
+if [[ "$(lsb_release -sr 2>/dev/null)" != "24.04" ]]; then
   echo "[UBUNTU SETUP] Your Ubuntu version is not supported $(lsb_release -sr 2>/dev/null)! Abort."
   exit 1
 else
   echo "[UBUNTU SETUP] Running on $(lsb_release -sd 2>/dev/null)."
 fi
 
-if [ -f ~/.nvm/nvm.sh ]; then
+if [ -f ~/.nvm/nvm.sh ] && ! command -v nvm &>/dev/null; then
   # sourcing nvm manually since it is for whatever reason not available by default in bash scripts
   # shellcheck disable=SC1090
   source ~/.nvm/nvm.sh
 fi
 
-if [ "$UBUNTU_SETUP_RECONFIGURE_GIT" == "1" ] || [ "$UBUNTU_SETUP_RECONFIGURE_LENAS_GIT" == "1" ]; then
+if [[ "${UBUNTU_SETUP_RECONFIGURE_GIT:-}" == "1" ]] || [[ "${UBUNTU_SETUP_RECONFIGURE_LENAS_GIT:-}" == "1" ]]; then
   reconfigureGit
 fi
-if [ "$UBUNTU_SETUP_RECONFIGURE_VSCODE" == "1" ] || [ "$UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE" == "1" ]; then
+if [[ "${UBUNTU_SETUP_RECONFIGURE_VSCODE:-}" == "1" ]] || [[ "${UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE:-}" == "1" ]]; then
   reconfigureVsCode
 fi
-if [ "$UBUNTU_SETUP_INSTALL_OPENSSH_SERVER" == "1" ]; then
+if [[ "${UBUNTU_SETUP_INSTALL_OPENSSH_SERVER:-}" == "1" ]]; then
   installOpenSshServer
 fi
-if [ "$UBUNTU_SETUP_BASIC_SETUP" == "1" ] || [ "$UBUNTU_SETUP_LENAS_SETUP" == "1" ]; then
+if [[ "${UBUNTU_SETUP_BASIC_SETUP:-}" == "1" ]] || [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
   startUbuntuSetup
 fi
