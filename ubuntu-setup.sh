@@ -20,11 +20,14 @@ function downloadAndVerify() {
 
   if [[ "$useTempFile" == "true" ]]; then
     downloadFile=$(mktemp --suffix=".$fileName")
+    # ensure file cleanup on exit
+    # shellcheck disable=SC2064
+    trap "rm -f -- '$downloadFile'" EXIT
   else
     downloadFile="$HOME/Downloads/$fileName"
   fi
 
-  if [ -f "$downloadFile" ]; then
+  if [[ "$useTempFile" != "true" ]] && [ -f "$downloadFile" ]; then
     echo "File '$downloadFile' already exists. Skip download."
   else
     echo "Downloading '$url' to '$downloadFile'..."
@@ -51,16 +54,17 @@ function downloadAndExecute() {
   local controlHash=${3:-}
   local runAsRoot=${4:-}
 
-  downloadAndVerify "$url" "$fileName" "$controlHash"
+  downloadAndVerify "$url" "$fileName" "$controlHash" true
   local tempFile=${UBUNTU_SETUP_LAST_DOWNLOADED_FILE:-}
 
   echo "Making file executable..."
   chmod +x "$tempFile"
 
-  echo "Executing file..."
   if [[ "$runAsRoot" == "true" ]]; then
+    echo "Executing file '$tempFile' as root..."
     sudo "$tempFile"
   else
+    echo "Executing file '$tempFile'..."
     bash "$tempFile"
   fi
 }
@@ -75,18 +79,12 @@ function appendUniqueLineToBashrc() {
   fi
 }
 
-function gsettingsSchemaExists() {
-  local schema=${1:-}
-
-  gsettings list-schemas | grep -Fxq "$schema"
-}
-
 function setGsettingIfSchemaExists() {
   local schema=${1:-}
   local key=${2:-}
   local value=${3:-}
 
-  if gsettingsSchemaExists "$schema"; then
+  if gsettings list-schemas | grep -Fxq "$schema"; then
     gsettings set "$schema" "$key" "$value"
   else
     echo "[UBUNTU SETUP] Skip missing gsettings schema: $schema"
@@ -113,23 +111,29 @@ function configureGnomeSettings() {
   setGsettingIfSchemaExists org.gnome.gedit.preferences.editor insert-spaces true
   setGsettingIfSchemaExists org.gnome.gedit.preferences.editor tabs-size 'uint32 2'
 
-  echo "[UBUNTU SETUP] Adjust GNOME user settings to disable new tiling feature..."
+  echo "[UBUNTU SETUP] Adjust GNOME user settings to disable new annoying tiling feature..."
   setGsettingIfSchemaExists org.gnome.mutter.keybindings toggle-tiled-left "['<Super>Left']"
   setGsettingIfSchemaExists org.gnome.mutter.keybindings toggle-tiled-right "['<Super>Right']"
 
-  echo "[UBUNTU SETUP] Adjust GNOME user settings to disable default shortcuts that interfere with VSCode..."
-  setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings toggle-shaded "[]"
-  setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings begin-move "[]"
-  setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings panel-main-menu "[]"
+  #echo "[UBUNTU SETUP] Adjust GNOME user settings to disable default shortcuts that interfere with IntelliJ..."
+  #setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings toggle-shaded "['disabled']"
 
-  #gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-right "[]"
-  #gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-left "[]"
-  #gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-down "['<Super><Shift>Page_Down']"
-  #gsettings set org.gnome.desktop.wm.keybindings move-to-workspace-up "['<Super><Shift>Page_Up']"
+  if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
+    echo "[UBUNTU SETUP] Adjust GNOME user settings to disable default shortcuts that interfere with Tomb Raider games..."
+    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings move-to-workspace-down "['<Control><Shift>Down']"
+    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings move-to-workspace-left "['<Control><Shift>Left']"
+    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings move-to-workspace-right "['<Control><Shift>Right']"
+    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings move-to-workspace-up "['<Control><Shift>Up']"
 
-  #echo "[UBUNTU SETUP] Set mouse acceleration profile to 'flat' to avoid drag and drop issues..."
-  #gsettings set org.gnome.desktop.peripherals.mouse accel-profile 'flat'
-  #gsettings set org.gnome.desktop.peripherals.mouse speed 'double 1.0'
+    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings switch-to-workspace-down "['<Alt><Shift>Down']"
+    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings switch-to-workspace-left "['<Alt><Shift>Left']"
+    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings switch-to-workspace-right "['<Alt><Shift>Right']"
+    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings switch-to-workspace-up "['<Alt><Shift>Up']"
+
+    #echo "[UBUNTU SETUP] Set mouse acceleration profile to 'flat' to avoid drag and drop issues..."
+    #setGsettingIfSchemaExists set org.gnome.desktop.peripherals.mouse accel-profile 'flat'
+    #setGsettingIfSchemaExists set org.gnome.desktop.peripherals.mouse speed 'double 1.0'
+  fi
 }
 
 function reconfigureGit() {
@@ -253,12 +257,13 @@ function reconfigureVsCode() {
   if ! command -v jq &>/dev/null; then
     sudo apt install -y jq
   fi
-  if ! command -v nvm &>/dev/null; then
+  if ! command -v fnm &>/dev/null || ! command -v node &>/dev/null; then
     installNodeJs
   fi
 
-  node_24=$(nvm which 24)
-  if [ -z "$node_24" ] || ! [ -x "$node_24" ]; then
+  fnm use 24
+  node_24="$FNM_DIR/node-versions/$(fnm current)/installation/bin/node"
+  if ! [ -x "$node_24" ]; then
     echo "Unexpected error: could not detect Node.js 24 executable!"
     echo "Abort."
     exit 1
@@ -333,7 +338,7 @@ function reconfigureVsCode() {
 
 function installCommandlineBasics() {
   echo "[UBUNTU SETUP] Install basic command line utilities..."
-  sudo apt install -y fish plocate rhash curl pwgen optipng rar p7zip-full pdftk-java libsecret-tools mesa-utils apt-transport-https
+  sudo apt install -y fish plocate rhash curl pwgen optipng rar p7zip-full pdftk-java libsecret-tools mesa-utils apt-transport-https texlive-extra-utils texlive-latex-recommended
 }
 
 function installSystemUtils() {
@@ -472,10 +477,35 @@ function installSpotify() {
   fi
 }
 
+function installGodot() {
+  if ! command -v godot &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Godot..."
+    sudo snap install godot --classic
+  else
+    echo "[UBUNTU SETUP] Godot is already installed. Nothing to do."
+  fi
+}
+
 function installVsCode() {
   if ! command -v code &>/dev/null; then
     echo "[UBUNTU SETUP] Installing VSCode..."
-    sudo snap install code --classic
+    # update your package list and install required packages
+    sudo apt install -y curl gpg
+    # download and install the Microsoft GPG key
+    curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+    # create the repository configuration file
+    echo "Types: deb
+URIs: https://packages.microsoft.com/repos/code
+Suites: stable
+Components: main
+Architectures: amd64,arm64,armhf
+Signed-By: /usr/share/keyrings/microsoft.gpg
+" | sudo tee /etc/apt/sources.list.d/vscode.sources
+    # update the package cache and install VS Code
+    sudo apt update
+    sudo apt install -y code
+    # install useful CLI tools for Copilot
+    sudo apt install -y jq fdclone bat git-delta shellcheck hyperfine entr tree ripgrep
     reconfigureVsCode
   else
     echo "[UBUNTU SETUP] VSCode is already installed. Nothing to do."
@@ -568,6 +598,23 @@ function installGimp() {
     fi
   else
     echo "[UBUNTU SETUP] Gimp is already installed. Nothing to do."
+  fi
+}
+
+function installBlender() {
+  if ! command -v blender &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Blender..."
+    installFlatpak true
+
+    if ! flatpak info org.blender.Blender &>/dev/null; then
+      flatpak install -y --user flathub org.blender.Blender
+      flatpak run --user org.blender.Blender &
+      disown
+    else
+      echo "[UBUNTU SETUP] Blender is already installed via Flatpak. Nothing to do."
+    fi
+  else
+    echo "[UBUNTU SETUP] Blender is already installed. Nothing to do."
   fi
 }
 
@@ -672,6 +719,13 @@ Signed-By: /usr/share/keyrings/steam.gpg" | sudo tee /etc/apt/sources.list.d/ste
     # installer creates a /etc/apt/sources.list.d/steam-stable.list file on its own
     sudo rm -vf /etc/apt/sources.list.d/steam.sources
     sudo apt update
+
+    if ! [ -d ~/.local/share/Steam ]; then
+      mkdir -p ~/.local/share/Steam
+    fi
+    if ! [ -f ~/.local/share/Steam/steam_dev.cfg ] || ! grep -qE '^@ShaderBackgroundProcessingThreads[[:space:]]+[[:digit:]]+' ~/.local/share/Steam/steam_dev.cfg; then
+      echo "@ShaderBackgroundProcessingThreads $(nproc)" >>~/.local/share/Steam/steam_dev.cfg
+    fi
 
     installProtonUp
   else
@@ -799,25 +853,38 @@ function installVeracrypt() {
 }
 
 function installNodeJs() {
-  if ! [ -f ~/.nvm/nvm.sh ]; then
-    echo "[UBUNTU SETUP] Installing Node Version Manager (nvm)..."
-    downloadAndExecute https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh nvm-install.sh a8e082d8d1a9b61a09e5d3e1902d2930e5b1b84a86f9777c7d2eb50ea204c0141f6a97c54a860bc3282e7b000f1c669c755f5e0db7bd6d492072744c302c0a21
+  if ! command -v fnm &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Fast Node Manager (fnm)..."
+    downloadAndExecute https://fnm.vercel.app/install install-fnm.sh 1cd47ee9579b492dffe2ed081e4e9178353a6f08b37fdc15c2b3fae983f1789ab27b96dc71907e36cbb7da774767c38cf6bd7c57baf88396cb8ddf2374b2aa58
+
+    if ! [ -x ~/.local/share/fnm/fnm ]; then
+      echo "Failed to install Fast Node Manager (fnm). Abort."
+      exit 1
+    fi
+
+    # install script already registered fnm in ~/.bashrc for us,
+    # but for whatever reason we cannot source it the current session
+    PATH=PATH:~/.local/share/fnm
+
+    if command -v fish && [ -d ~/.config/fish/conf.d/ ]; then
+      echo "Adding FNM env vars to Fish shell config..."
+      fnm env --use-on-cd --shell fish >>~/.config/fish/conf.d/fnm.fish
+    fi
+    if command -v zsh &>/dev/null; then
+      echo "Adding FNM env vars to ~/.zshrc..."
+      fnm env --use-on-cd --shell zsh >>~/.zshrc
+    fi
   else
-    echo "[UBUNTU SETUP] Node Version Manager (nvm) is already installed."
+    echo "[UBUNTU SETUP] Fast Node Manager (fnm) is already installed."
   fi
 
-  if ! command -v nvm &>/dev/null; then
-    # shellcheck disable=SC1090
-    source ~/.nvm/nvm.sh
-  fi
-
-  if [[ "$(nvm -v)" == "v24."* ]]; then
-    echo "[UBUNTU SETUP] Installing and activating Node.js 24..."
-    nvm install 24
-    nvm alias default 24
-    nvm use 24
+  if ! command -v node &>/dev/null || [[ "$(node -v)" != "v24."* ]]; then
+    echo "[UBUNTU SETUP] Installing and activating Node.js 24 via fnm..."
+    fnm install 24
+    fnm alias 24 default
+    fnm use 24
   else
-    echo "[UBUNTU SETUP] Node.js 24 is already installed."
+    echo "[UBUNTU SETUP] Node.js 24 is already installed via fnm, nothing to do."
   fi
 }
 
@@ -841,7 +908,7 @@ function installRust() {
 function installGit() {
   if ! command -v git &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Git..."
-    sudo apt install -y git fish
+    sudo apt install -y git fish zsh
     reconfigureGit
   else
     echo "[UBUNTU SETUP] Git is already installed. Nothing to do."
@@ -861,6 +928,7 @@ function installDevTools() {
     installJava
     installGradle
     installAndroidSdk
+    installGodot
   fi
 }
 
@@ -897,6 +965,7 @@ function startUbuntuSetup() {
   installGimp
   installInkscape
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
+    installBlender
     installElement
   fi
 
@@ -1015,12 +1084,6 @@ if [[ "$(lsb_release -sr 2>/dev/null)" != "24.04" ]]; then
   exit 1
 else
   echo "[UBUNTU SETUP] Running on $(lsb_release -sd 2>/dev/null)."
-fi
-
-if [ -f ~/.nvm/nvm.sh ] && ! command -v nvm &>/dev/null; then
-  # sourcing nvm manually since it is for whatever reason not available by default in bash scripts
-  # shellcheck disable=SC1090
-  source ~/.nvm/nvm.sh
 fi
 
 if [[ "${UBUNTU_SETUP_RECONFIGURE_GIT:-}" == "1" ]] || [[ "${UBUNTU_SETUP_RECONFIGURE_LENAS_GIT:-}" == "1" ]]; then
