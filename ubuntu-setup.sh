@@ -447,6 +447,20 @@ function installCustomFonts() {
     'https://dl.dafont.com/dl/?f=magic_stary' \
     'magic_stary.zip' \
     '456e4c750ba8736dcd53597eed965ac9c24c5d8db34503fb698fca1a90594da993ace44a0fb8ac7a79c5f562faf1394370e8242db452b44810c767f6c6aa9433'
+  installCustomFont \
+    'Bad Grunge' \
+    'truetype' \
+    'bad-grunge' \
+    'https://dl.dafont.com/dl/?f=bad_grunge' \
+    'bad-grunge.zip' \
+    '23de0f49901853029f14350e362baef5e8ee600c87d406c1192421cc53dcb38349783c69f73e24de2cd2cee23690d33c4336a9f3c499cbcce85da437a21e5f9e'
+  installCustomFont \
+    'Gunplay' \
+    'opentype' \
+    'gunplay' \
+    'https://dl.dafont.com/dl/?f=gunplay' \
+    'gunplay.zip' \
+    'db512819efc53586b0cd66bd8ecf7aa9fadccf5be41b5901e50eb6b6704a368aa6f1e07787bade6dc08610667f11c3f5503740b3327a04592ac685c65ffc8a24'
 
   if [[ "${UBUNTU_SETUP_CUSTOM_FONT_INSTALLED:-}" == "1" ]]; then
     sudo fc-cache -fv
