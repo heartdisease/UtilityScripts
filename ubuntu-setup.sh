@@ -357,6 +357,9 @@ function installMultimediaUtils() {
 function installMsFonts() {
   if ! read -r -n1 -d "" < <(fc-list | grep -oi "Arial.ttf\|Verdana.ttf\|times.ttf"); then
     echo "[UBUNTU SETUP] Installing MS core fonts..."
+    # automatically accepts the Microsoft End User License Agreement (EULA),
+    # preventing the interactive prompt from the ttf-mscorefonts-installer
+    echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
     sudo apt install -y ttf-mscorefonts-installer fonts-crosextra-carlito fonts-crosextra-caladea
     sudo fc-cache -fv
   else
@@ -522,8 +525,8 @@ function installFlatpak() {
     sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
     flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
-    flatpak update
-    flatpak update --appstream
+    flatpak update -y --noninteractive
+    flatpak update -y --noninteractive --appstream
   elif [[ "$disableSkipMessage" != "true" ]]; then
     echo "[UBUNTU SETUP] Flatpak is already installed. Nothing to do."
   fi
@@ -999,7 +1002,7 @@ function startUbuntuSetup() {
 
   sudo snap refresh
   flatpak uninstall -y --unused
-  flatpak update
+  flatpak update -y --noninteractive
 
   echo "[UBUNTU SETUP] Setup complete!"
   exit 0
