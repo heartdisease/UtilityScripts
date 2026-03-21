@@ -91,6 +91,20 @@ function setGsettingIfSchemaExists() {
   fi
 }
 
+function configureFirewall() {
+  echo "[UBUNTU SETUP] Setting up UFW (Uncomplicated Firewall)..."
+  # ensure firewall is active and enabled on system startup
+  sudo ufw enable
+  # block common HTTP(S) ports used by local webservers
+  sudo ufw deny 8080
+  sudo ufw deny 3000
+  # block default port for Ollama
+  sudo ufw deny 11434
+
+  # list current UFW configuration
+  sudo ufw status numbered
+}
+
 function configureGnomeSettings() {
   if ! command -v gsettings &>/dev/null; then
     echo "[UBUNTU SETUP] Unexpected error: gsettings is not present!"
@@ -118,7 +132,7 @@ function configureGnomeSettings() {
   #echo "[UBUNTU SETUP] Adjust GNOME user settings to disable default shortcuts that interfere with IntelliJ..."
   #setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings toggle-shaded "['disabled']"
 
-  if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
+  if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]] || [[ "${UBUNTU_SETUP_CONFIGURE_LENAS_GSETTINGS:-}" == "1" ]]; then
     echo "[UBUNTU SETUP] Adjust GNOME user settings to disable default shortcuts that interfere with Tomb Raider games..."
     setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings move-to-workspace-down "['<Control><Shift>Down']"
     setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings move-to-workspace-left "['<Control><Shift>Left']"
@@ -278,12 +292,11 @@ function reconfigureVsCode() {
 
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]] || [[ "${UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE:-}" == "1" ]]; then
     echo "Installing Lena's VSCode extensions <3..."
+    code --install-extension vitest.explorer
     code --install-extension ms-playwright.playwright
     code --install-extension esbenp.prettier-vscode
     code --install-extension dbaeumer.vscode-eslint
     code --install-extension rust-lang.rust-analyzer
-    code --install-extension ms-python.python
-    code --install-extension charliermarsh.ruff
     code --install-extension mads-hartmann.bash-ide-vscode
     code --install-extension timonwong.shellcheck
     code --install-extension mkhl.shfmt
@@ -338,7 +351,7 @@ function reconfigureVsCode() {
 
 function installCommandlineBasics() {
   echo "[UBUNTU SETUP] Install basic command line utilities..."
-  sudo apt install -y fish plocate rhash curl pwgen optipng rar p7zip-full pdftk-java libsecret-tools mesa-utils apt-transport-https texlive-extra-utils texlive-latex-recommended
+  sudo apt install -y fish curl net-tools plocate rhash pwgen p7zip-full rar optipng pdftk-java libsecret-tools mesa-utils apt-transport-https texlive-extra-utils texlive-latex-recommended
 }
 
 function installSystemUtils() {
@@ -521,11 +534,41 @@ Signed-By: /usr/share/keyrings/microsoft.gpg
     # update the package cache and install VS Code
     sudo apt update
     sudo apt install -y code
+
     # install useful CLI tools for Copilot
     sudo apt install -y jq fdclone bat git-delta shellcheck hyperfine entr tree ripgrep
+
     reconfigureVsCode
   else
     echo "[UBUNTU SETUP] VSCode is already installed. Nothing to do."
+  fi
+
+  if [[ "${UBUNTU_SETUP_INSTALL_OLLAMA:-}" == "1" ]]; then
+    local preferredModel="qwen2.5-coder:7b-instruct-q4_K_M"
+
+    if ! [ -d ~/.continue ]; then
+      mkdir ~/.continue
+    fi
+
+    echo "[UBUNTU SETUP] Create configuration file '~/.continue/config.yaml' for Continue..."
+    echo "name: Local Config
+version: 1.0.0
+schema: v1
+models:
+  - name: Qwen 2.5 Coder 7B
+    provider: ollama
+    model: $preferredModel
+    roles:
+      - chat
+      - edit
+      - autocomplete
+      - apply" | tee ~/.continue/config.yaml
+
+    # ensures Node.js is installed and installs Continue CLI
+    installNodeJs
+
+    echo "[UBUNTU SETUP] Installing VSCode extension 'Continue' for IDE integration..."
+    code --install-extension Continue.continue
   fi
 }
 
@@ -869,19 +912,106 @@ function installVeracrypt() {
   fi
 }
 
+function installOllama() {
+  local preferredModel="qwen2.5-coder:7b-instruct-q4_K_M"
+
+  if ! command -v ollama &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Ollama..."
+    downloadAndExecute https://ollama.com/install.sh install-ollama.sh 087e24f4444544e4387b669df0bf945cffcbbcdfd7f69e8bc5a980a51b0d2f024e16678b0c1a8f2fcca581f0984153127e75be9d6aa8294a0c97055755e55880
+
+    echo "Adding OLLAMA_AUTH_TOKEN to ~/.bashrc..."
+    export OLLAMA_AUTH_TOKEN="ollama"
+    appendUniqueLineToBashrc 'export OLLAMA_AUTH_TOKEN="ollama"'
+
+    echo "Adding OLLAMA_MAX_LOADED_MODELS to ~/.bashrc..."
+    export OLLAMA_MAX_LOADED_MODELS=1
+    appendUniqueLineToBashrc 'export OLLAMA_MAX_LOADED_MODELS=1'
+
+    echo "Adding OLLAMA_KEEP_ALIVE to ~/.bashrc..."
+    export OLLAMA_KEEP_ALIVE="5m"
+    appendUniqueLineToBashrc 'export OLLAMA_KEEP_ALIVE="5m"'
+
+    if lspci | grep -i 'vga\|3d\|display' | grep -q '[GeForce RTX 2070 SUPER]'; then
+      echo "[UBUNTU SETUP] Installing Qwen3-Coder (14B with Q4_K_M quantization; 4-bit, optimized for efficiency and performance) model for agentic coding..."
+      ollama pull "$preferredModel"
+      ollama list
+    else
+      local graphicsCardName
+      graphicsCardName=$(lspci | grep -i 'vga\|3d\|display' | grep -ioE '\[([A-Za-z0-9 ]+)\]' | sed -E 's/^\[(.+)\]$/\1/')
+      local encodedGraphicsCardName
+      # shellcheck disable=SC2001
+      encodedGraphicsCardName=$(echo "$graphicsCardName" | sed 's/ /+/g')
+
+      echo "[UBUNTU SETUP] Could not auto-detect appropriate Ollama coding model for your graphics card: $graphicsCardName"
+      echo "[UBUNTU SETUP] Check out this link to find a suitable model for your hardware setup: https://search.brave.com/ask?q=Best+Ollama+coding+model+for+$encodedGraphicsCardName+in+$(date +%Y)"
+    fi
+  else
+    echo "[UBUNTU SETUP] Ollama is already installed."
+  fi
+
+  if ! command -v opencode &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing OpenCode..."
+    downloadAndExecute https://opencode.ai/install install-opencode.sh 5627a0f3ddb896405929cb7718d00df8c0be33a228318106c091b4d553ef48623c1a7d9fe3ccdedb9509f6e4f89e1daf5451c181f6fe51b976ac5c2a6bcb7fe3
+
+    if ! [ -d ~/.config/opencode ]; then
+      mkdir ~/.config/opencode
+    fi
+
+    # shellcheck disable=SC2016
+    echo '{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://localhost:11434/v1"
+      },
+      "models": {
+        "'"$preferredModel"'": {
+          "name": "Qwen2.5 Coder 7B (4k context)"
+        }
+      }
+    }
+  }
+}' | tee ~/.config/opencode/opencode.json
+
+    echo "You can now launch OpenCode via Ollama by running: ollama launch opencode --model $preferredModel"
+  else
+    echo "[UBUNTU SETUP] OpenCode is already installed."
+  fi
+
+  if ! command -v claude &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Claude Code..."
+    downloadAndExecute https://claude.ai/install.sh install-claude.sh c48fd1767e189e15ad6cf0293528cc55c078ff89ff25951a7cb0212e3e99792b288ea54fa33f23a54832f1c7f758551cd44f8b8ae6b4a98e6ce22ae8a1bbddac
+
+    echo "Adding ANTHROPIC_BASE_URL to ~/.bashrc..."
+    export ANTHROPIC_BASE_URL="http://localhost:11434"
+    appendUniqueLineToBashrc 'export ANTHROPIC_BASE_URL="http://localhost:11434"'
+
+    echo "Adding unsetting ANTHROPIC_AUTH_TOKEN to ~/.bashrc..."
+    unset ANTHROPIC_AUTH_TOKEN
+    appendUniqueLineToBashrc 'unset ANTHROPIC_AUTH_TOKEN'
+
+    echo "You can now launch Claude Code via Ollama by running: ollama launch claude --model $preferredModel"
+  else
+    echo "[UBUNTU SETUP] Claude Code is already installed."
+  fi
+}
+
 function installNodeJs() {
   if ! command -v fnm &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Fast Node Manager (fnm)..."
     downloadAndExecute https://fnm.vercel.app/install install-fnm.sh 1cd47ee9579b492dffe2ed081e4e9178353a6f08b37fdc15c2b3fae983f1789ab27b96dc71907e36cbb7da774767c38cf6bd7c57baf88396cb8ddf2374b2aa58
 
-    if ! [ -x ~/.local/share/fnm/fnm ]; then
-      echo "Failed to install Fast Node Manager (fnm). Abort."
-      exit 1
-    fi
-
     # install script already registered fnm in ~/.bashrc for us,
     # but for whatever reason we cannot source it the current session
     PATH=PATH:~/.local/share/fnm
+
+    if ! command -v fnm; then
+      echo "Failed to install Fast Node Manager (fnm). Abort."
+      exit 1
+    fi
 
     if command -v fish && [ -d ~/.config/fish/conf.d/ ]; then
       echo "Adding FNM env vars to Fish shell config..."
@@ -902,6 +1032,11 @@ function installNodeJs() {
     fnm use 24
   else
     echo "[UBUNTU SETUP] Node.js 24 is already installed via fnm, nothing to do."
+  fi
+
+  if [[ "${UBUNTU_SETUP_INSTALL_OLLAMA:-}" == "1" ]]; then
+    echo "[UBUNTU SETUP] Installing Continue CLI tools for agentic coding and Rules CLI for creating agent rules..."
+    npm i -g @continuedev/cli rules-cli
   fi
 }
 
@@ -972,6 +1107,8 @@ function startUbuntuSetup() {
   installMultimediaUtils
   installCommandlineBasics
 
+  # disable useless snapshots for snap packages to safe time
+  sudo snap set system snapshots.automatic.retention=no
   # install snap packages
   installDiscord
   installSpotify
@@ -1010,6 +1147,9 @@ function startUbuntuSetup() {
   # install dev tools
   installDevTools
 
+  # set up UFW (Uncomplicated Firewall)
+  configureFirewall
+
   sudo apt update
   sudo apt upgrade -y
   sudo apt autoremove -y
@@ -1026,14 +1166,17 @@ function printHelpText() {
   echo "Usage: ./ubuntu-setup.sh [OPTION]"
   echo "Installs and configures Ubuntu."
   echo
-  echo "  -h, --help                    prints this help text"
-  echo "  --basic-setup                 run only essential install and configure only the most relevant options"
-  echo "  --lenas-setup                 run full install and configure all available options (except for openssh-server)"
-  echo "  --reconfigure-git             deletes local git config and reconfigures it from scratch"
-  echo "  --reconfigure-lenas-git       same as --reconfigure-git, but with private extra settings for Lena <3"
-  echo "  --reconfigure-vscode          deletes local VSCode config and reconfigures it from scratch"
-  echo "  --reconfigure-lenas-vscode    same as --reconfigure-vscode, but with private extra settings for Lena <3"
-  echo "  --install-openssh-server      installs openssh-server for local testing"
+  echo "  -h, --help                      prints this help text"
+  echo "  --basic-setup                   run only essential install and configure only the most relevant options"
+  echo "  --lenas-setup                   run full install and configure all available options (except for openssh-server)"
+  echo "  --install-ollama                installs Ollama and sets up AI models and VSCode integration"
+  echo "  --install-openssh-server        installs openssh-server for local testing"
+  echo "  --configure-gsettings           configures useful GNOME settings"
+  echo "  --configure-lenas-gsettings     same as --configure-gsettings, but with private extra settings for Lena <3"
+  echo "  --reconfigure-git               deletes local git config and reconfigures it from scratch"
+  echo "  --reconfigure-lenas-git         same as --reconfigure-git, but with private extra settings for Lena <3"
+  echo "  --reconfigure-vscode            deletes local VSCode config and reconfigures it from scratch"
+  echo "  --reconfigure-lenas-vscode      same as --reconfigure-vscode, but with private extra settings for Lena <3"
 }
 
 ## MAIN ##
@@ -1049,16 +1192,8 @@ for arg in "$@"; do
     printHelpText
     exit 0
   elif [[ "$arg" == "--basic-setup" ]]; then
-    if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
-      echo "Error: option --basic-setup is mutually exclusive with option --lenas-setup"
-      exit 1
-    fi
     UBUNTU_SETUP_BASIC_SETUP=1
   elif [[ "$arg" == "--lenas-setup" ]]; then
-    if [[ "${UBUNTU_SETUP_BASIC_SETUP:-}" == "1" ]]; then
-      echo "Error: option --lenas-setup is mutually exclusive with option --basic-setup"
-      exit 1
-    fi
     UBUNTU_SETUP_LENAS_SETUP=1
   elif [[ "$arg" == "--reconfigure-git" ]]; then
     UBUNTU_SETUP_RECONFIGURE_GIT=1
@@ -1068,6 +1203,12 @@ for arg in "$@"; do
     UBUNTU_SETUP_RECONFIGURE_VSCODE=1
   elif [[ "$arg" == "--reconfigure-lenas-vscode" ]]; then
     UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE=1
+  elif [[ "$arg" == "--configure-gsettings" ]]; then
+    UBUNTU_SETUP_CONFIGURE_GSETTINGS=1
+  elif [[ "$arg" == "--configure-lenas-gsettings" ]]; then
+    UBUNTU_SETUP_CONFIGURE_LENAS_GSETTINGS=1
+  elif [[ "$arg" == "--install-ollama" ]]; then
+    UBUNTU_SETUP_INSTALL_OLLAMA=1
   elif [[ "$arg" == "--install-openssh-server" ]]; then
     UBUNTU_SETUP_INSTALL_OPENSSH_SERVER=1
   else
@@ -1106,12 +1247,43 @@ fi
 if [[ "${UBUNTU_SETUP_RECONFIGURE_GIT:-}" == "1" ]] || [[ "${UBUNTU_SETUP_RECONFIGURE_LENAS_GIT:-}" == "1" ]]; then
   reconfigureGit
 fi
+
 if [[ "${UBUNTU_SETUP_RECONFIGURE_VSCODE:-}" == "1" ]] || [[ "${UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE:-}" == "1" ]]; then
   reconfigureVsCode
 fi
-if [[ "${UBUNTU_SETUP_INSTALL_OPENSSH_SERVER:-}" == "1" ]]; then
-  installOpenSshServer
+
+if [[ "${UBUNTU_SETUP_CONFIGURE_GSETTINGS:-}" == "1" ]] || [[ "${UBUNTU_SETUP_CONFIGURE_LENAS_GSETTINGS:-}" == "1" ]]; then
+  configureGnomeSettings
 fi
-if [[ "${UBUNTU_SETUP_BASIC_SETUP:-}" == "1" ]] || [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
+
+if [[ "${UBUNTU_SETUP_INSTALL_OLLAMA:-}" == "1" ]]; then
+  if [[ "${UBUNTU_SETUP_BASIC_SETUP:-}" == "1" ]]; then
+    echo "Error: option --install-ollama is mutually exclusive with option --basic-setup"
+    exit 1
+  elif [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
+    echo "Error: option --install-ollama is mutually exclusive with option --lenas-setup"
+    exit 1
+  else
+    installOllama
+    installVsCode
+  fi
+fi
+
+if [[ "${UBUNTU_SETUP_INSTALL_OPENSSH_SERVER:-}" == "1" ]]; then
+  if [[ "${UBUNTU_SETUP_BASIC_SETUP:-}" == "1" ]]; then
+    echo "Error: option --install-openssh-server is mutually exclusive with option --basic-setup"
+    exit 1
+  elif [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
+    echo "Error: option --install-openssh-server is mutually exclusive with option --lenas-setup"
+    exit 1
+  else
+    installOpenSshServer
+  fi
+fi
+
+if [[ "${UBUNTU_SETUP_BASIC_SETUP:-}" == "1" ]] && [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
+  echo "Error: option --basic-setup is mutually exclusive with option --lenas-setup"
+  exit 1
+elif [[ "${UBUNTU_SETUP_BASIC_SETUP:-}" == "1" ]] || [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
   startUbuntuSetup
 fi
