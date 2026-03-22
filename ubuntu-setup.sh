@@ -535,47 +535,19 @@ Signed-By: /usr/share/keyrings/microsoft.gpg
     sudo apt update
     sudo apt install -y code
 
-    # install useful CLI tools for Copilot
-    sudo apt install -y jq fdclone bat git-delta shellcheck hyperfine entr tree ripgrep
-
     reconfigureVsCode
   else
     echo "[UBUNTU SETUP] VSCode is already installed. Nothing to do."
   fi
 
   if [[ "${UBUNTU_SETUP_INSTALL_OLLAMA:-}" == "1" ]]; then
-    local preferredModel="qwen2.5-coder:7b-instruct-q4_K_M"
-
-    if ! [ -d ~/.continue ]; then
-      mkdir ~/.continue
-    fi
-
-    echo "[UBUNTU SETUP] Create configuration file '~/.continue/config.yaml' for Continue..."
-    echo "name: Local Config
-version: 1.0.0
-schema: v1
-models:
-  - name: Qwen 2.5 Coder 7B
-    provider: ollama
-    model: $preferredModel
-    apiBase: http://localhost:11434
-    capabilities:
-      - tool_use
-    roles:
-      - chat
-      - edit
-      - autocomplete
-      - apply
-context:
-  - provider: diff
-  - provider: file
-  - provider: code" | tee ~/.continue/config.yaml
-
     # ensures Node.js is installed and installs Continue CLI
     installNodeJs
+    # install useful CLI tools for Copilot
+    sudo apt install -y jq fdclone bat git-delta shellcheck hyperfine entr tree ripgrep
 
-    echo "[UBUNTU SETUP] Installing VSCode extension 'Continue' for IDE integration..."
-    code --install-extension Continue.continue
+    echo "[UBUNTU SETUP] Installing OpenCode extension for VSCode..."
+    code --install-extension sst-dev.opencode
   fi
 }
 
@@ -920,9 +892,9 @@ function installVeracrypt() {
 }
 
 function installOllama() {
-  local preferredModel="qwen2.5-coder:7b-instruct-q4_K_M"
-
   if ! command -v ollama &>/dev/null; then
+    local graphicsCardName
+
     echo "[UBUNTU SETUP] Installing Ollama..."
     downloadAndExecute https://ollama.com/install.sh install-ollama.sh 087e24f4444544e4387b669df0bf945cffcbbcdfd7f69e8bc5a980a51b0d2f024e16678b0c1a8f2fcca581f0984153127e75be9d6aa8294a0c97055755e55880
 
@@ -938,14 +910,15 @@ function installOllama() {
     export OLLAMA_KEEP_ALIVE="5m"
     appendUniqueLineToBashrc 'export OLLAMA_KEEP_ALIVE="5m"'
 
+    graphicsCardName=$(lspci | grep -i 'vga\|3d\|display' | grep -ioE '\[([A-Za-z0-9 ]+)\]' | sed -E 's/^\[(.+)\]$/\1/')
+
     if lspci | grep -i 'vga\|3d\|display' | grep -q '[GeForce RTX 2070 SUPER]'; then
       echo "[UBUNTU SETUP] Installing Qwen3-Coder (14B with Q4_K_M quantization; 4-bit, optimized for efficiency and performance) model for agentic coding..."
-      ollama pull "$preferredModel"
+      ollama pull "$UBUNTU_SETUP_PREFERRED_MODEL"
       ollama list
     else
-      local graphicsCardName
-      graphicsCardName=$(lspci | grep -i 'vga\|3d\|display' | grep -ioE '\[([A-Za-z0-9 ]+)\]' | sed -E 's/^\[(.+)\]$/\1/')
       local encodedGraphicsCardName
+
       # shellcheck disable=SC2001
       encodedGraphicsCardName=$(echo "$graphicsCardName" | sed 's/ /+/g')
 
@@ -955,7 +928,9 @@ function installOllama() {
   else
     echo "[UBUNTU SETUP] Ollama is already installed."
   fi
+}
 
+function installOpenCode() {
   if ! command -v opencode &>/dev/null; then
     echo "[UBUNTU SETUP] Installing OpenCode..."
     downloadAndExecute https://opencode.ai/install install-opencode.sh 5627a0f3ddb896405929cb7718d00df8c0be33a228318106c091b4d553ef48623c1a7d9fe3ccdedb9509f6e4f89e1daf5451c181f6fe51b976ac5c2a6bcb7fe3
@@ -972,49 +947,42 @@ function installOllama() {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Ollama (local)",
       "options": {
-        "baseURL": "http://localhost:11434"
+        "baseURL": "http://localhost:11434/v1"
       },
       "models": {
-        "'"$preferredModel"'": {
+        "'"$UBUNTU_SETUP_PREFERRED_MODEL"'": {
           "name": "Qwen2.5 Coder 7B (4k context)"
         }
-      }
-    },
-    "permission": {
-      "read": {
-        "*": "ask",
-        "*.env": "deny",
-        "*.env.example": "allow"
-      },
-      "edit": "ask",
-      "bash": {
-        "*": "ask",
-        "git *": "ask",
-        "rm *": "deny",
-        "rm -rf *": "deny"
       }
     }
   }
 }' | tee ~/.config/opencode/opencode.json
 
-    echo "You can now launch OpenCode via Ollama by running: ollama launch opencode --model $preferredModel"
+    echo "You can now launch OpenCode via Ollama by running: ollama launch opencode --model $UBUNTU_SETUP_PREFERRED_MODEL"
   else
     echo "[UBUNTU SETUP] OpenCode is already installed."
   fi
+}
 
+function installClaudeCode() {
   if ! command -v claude &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Claude Code..."
     downloadAndExecute https://claude.ai/install.sh install-claude.sh c48fd1767e189e15ad6cf0293528cc55c078ff89ff25951a7cb0212e3e99792b288ea54fa33f23a54832f1c7f758551cd44f8b8ae6b4a98e6ce22ae8a1bbddac
 
-    echo "Adding ANTHROPIC_BASE_URL to ~/.bashrc..."
-    export ANTHROPIC_BASE_URL="http://localhost:11434"
-    appendUniqueLineToBashrc 'export ANTHROPIC_BASE_URL="http://localhost:11434"'
+    if ! [ -d ~/.claude ]; then
+      mkdir ~/.claude
+    fi
 
-    echo "Adding unsetting ANTHROPIC_AUTH_TOKEN to ~/.bashrc..."
-    unset ANTHROPIC_AUTH_TOKEN
-    appendUniqueLineToBashrc 'unset ANTHROPIC_AUTH_TOKEN'
+    echo '{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "ollama",
+    "ANTHROPIC_BASE_URL": "http://localhost:11434",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_ATTRIBUTION_HEADER": "0"
+  }
+}' | tee ~/.claude/settings.json
 
-    echo "You can now launch Claude Code via Ollama by running: ollama launch claude --model $preferredModel"
+    echo "You can now launch Claude Code via Ollama by running: ollama launch claude --model $UBUNTU_SETUP_PREFERRED_MODEL"
   else
     echo "[UBUNTU SETUP] Claude Code is already installed."
   fi
@@ -1285,7 +1253,11 @@ if [[ "${UBUNTU_SETUP_INSTALL_OLLAMA:-}" == "1" ]]; then
     echo "Error: option --install-ollama is mutually exclusive with option --lenas-setup"
     exit 1
   else
+    UBUNTU_SETUP_PREFERRED_MODEL="qwen2.5-coder:7b-instruct-q4_K_M"
+
     installOllama
+    installOpenCode
+    installClaudeCode
     installVsCode
   fi
 fi
