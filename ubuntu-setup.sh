@@ -20,9 +20,9 @@ function downloadAndVerify() {
 
   if [[ "$useTempFile" == "true" ]]; then
     downloadFile=$(mktemp --suffix=".$fileName")
-    # ensure file cleanup on exit
-    # shellcheck disable=SC2064
-    trap "rm -f -- '$downloadFile'" EXIT
+
+    # TODO ensure file cleanup on exit (currently throws an odd error)
+    # trap 'rm -f -- "$downloadFile"' EXIT
   else
     downloadFile="$HOME/Downloads/$fileName"
   fi
@@ -53,6 +53,7 @@ function downloadAndExecute() {
   local fileName=${2:-}
   local controlHash=${3:-}
   local runAsRoot=${4:-}
+  local pipeCommands=${5:-}
 
   downloadAndVerify "$url" "$fileName" "$controlHash" true
   local tempFile=${UBUNTU_SETUP_LAST_DOWNLOADED_FILE:-}
@@ -62,10 +63,20 @@ function downloadAndExecute() {
 
   if [[ "$runAsRoot" == "true" ]]; then
     echo "Executing file '$tempFile' as root..."
-    sudo "$tempFile"
+
+    if [[ "$pipeCommands" == "" ]]; then
+      sudo "$tempFile"
+    else
+      echo "$pipeCommands" | sudo "$tempFile"
+    fi
   else
     echo "Executing file '$tempFile'..."
-    bash "$tempFile"
+
+    if [[ "$pipeCommands" == "" ]]; then
+      bash "$tempFile"
+    else
+      bash -c "echo \"$pipeCommands\" | \"$tempFile\""
+    fi
   fi
 }
 
@@ -504,15 +515,6 @@ function installSpotify() {
     sudo snap install spotify
   else
     echo "[UBUNTU SETUP] Spotify is already installed. Nothing to do."
-  fi
-}
-
-function installGodot() {
-  if ! command -v godot &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Godot..."
-    sudo snap install godot --classic
-  else
-    echo "[UBUNTU SETUP] Godot is already installed. Nothing to do."
   fi
 }
 
@@ -993,7 +995,7 @@ function installNodeJs() {
 
     # install script already registered fnm in ~/.bashrc for us,
     # but for whatever reason we cannot source it the current session
-    PATH=PATH:~/.local/share/fnm
+    PATH=$PATH:~/.local/share/fnm
 
     if ! command -v fnm; then
       echo "Failed to install Fast Node Manager (fnm). Abort."
@@ -1019,6 +1021,45 @@ function installNodeJs() {
     fnm use 24
   else
     echo "[UBUNTU SETUP] Node.js 24 is already installed via fnm, nothing to do."
+  fi
+}
+
+function installGodot() {
+  if ! command -v gdvm &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Godot Version Manager (gdvm)..."
+    downloadAndExecute https://gdvm.io/install.sh install-gdvm.sh 66d6aa651ff5bbe149e4d8ac6f21e61da799ffd328b359c13efed5adddae3ac7feb5fc6525e71ae3bd96d983a71a4c51ec90600333cca34d1edbc6ff64d85f3c
+    # TODO find a way to suppress user prompt (should choose 'N')
+
+    # install script already registered fnm in ~/.bashrc for us,
+    # but for whatever reason we cannot source it the current session
+    PATH=$PATH:~/.gdvm/bin
+
+    if ! command -v gdvm; then
+      echo "Failed to install Godot Version Manager (gdvm). Abort."
+      exit 1
+    fi
+  else
+    echo "[UBUNTU SETUP] Godot Version Manager (gdvm) is already installed."
+  fi
+
+  if ! command -v godot &>/dev/null || [[ "$(godot --version 2>/dev/null)" != "4.5."* ]]; then
+    local currentGodotExec
+    local currentGodotHome
+
+    echo "[UBUNTU SETUP] Installing and activating Godot 4.5 via gdvm..."
+    gdvm use 4.5
+
+    currentGodotExec=$(gdvm show)
+    currentGodotHome=$(dirname "$currentGodotExec")
+
+    # add hard link to Godot executable so tools can find it
+    ln "$currentGodotExec" "$currentGodotHome/godot"
+
+    echo "Adding GODOT_HOME to ~/.bashrc..."
+    export GODOT_HOME="$currentGodotHome"
+    appendUniqueLineToBashrc 'export GODOT_HOME="'"$currentGodotHome"'"'
+  else
+    echo "[UBUNTU SETUP] Godot 4.5 is already installed via gdvm, nothing to do."
   fi
 }
 
@@ -1152,6 +1193,7 @@ function printHelpText() {
   echo "  --basic-setup                   run only essential install and configure only the most relevant options"
   echo "  --lenas-setup                   run full install and configure all available options (except for openssh-server)"
   echo "  --install-ollama                installs Ollama and sets up AI models and VSCode integration"
+  echo "  --install-godot                 installs Godot 4.5 via Godot Version Manager (gdvm)"
   echo "  --install-openssh-server        installs openssh-server for local testing"
   echo "  --configure-gsettings           configures useful GNOME settings"
   echo "  --configure-lenas-gsettings     same as --configure-gsettings, but with private extra settings for Lena <3"
@@ -1191,6 +1233,8 @@ for arg in "$@"; do
     UBUNTU_SETUP_CONFIGURE_LENAS_GSETTINGS=1
   elif [[ "$arg" == "--install-ollama" ]]; then
     UBUNTU_SETUP_INSTALL_OLLAMA=1
+  elif [[ "$arg" == "--install-godot" ]]; then
+    UBUNTU_SETUP_INSTALL_GODOT=1
   elif [[ "$arg" == "--install-openssh-server" ]]; then
     UBUNTU_SETUP_INSTALL_OPENSSH_SERVER=1
   else
@@ -1252,6 +1296,18 @@ if [[ "${UBUNTU_SETUP_INSTALL_OLLAMA:-}" == "1" ]]; then
     installOpenCode
     installClaudeCode
     installVsCode
+  fi
+fi
+
+if [[ "${UBUNTU_SETUP_INSTALL_GODOT:-}" == "1" ]]; then
+  if [[ "${UBUNTU_SETUP_BASIC_SETUP:-}" == "1" ]]; then
+    echo "Error: option --install-godot is mutually exclusive with option --basic-setup"
+    exit 1
+  elif [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
+    echo "Error: option --install-godot is mutually exclusive with option --lenas-setup"
+    exit 1
+  else
+    installGodot
   fi
 fi
 
