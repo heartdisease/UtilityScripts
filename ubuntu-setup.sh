@@ -541,8 +541,6 @@ Signed-By: /usr/share/keyrings/microsoft.gpg
   fi
 
   if [[ "${UBUNTU_SETUP_INSTALL_OLLAMA:-}" == "1" ]]; then
-    # ensures Node.js is installed and installs Continue CLI
-    installNodeJs
     # install useful CLI tools for Copilot
     sudo apt install -y jq fdclone bat git-delta shellcheck hyperfine entr tree ripgrep
 
@@ -1021,11 +1019,6 @@ function installNodeJs() {
     fnm use 24
   else
     echo "[UBUNTU SETUP] Node.js 24 is already installed via fnm, nothing to do."
-  fi
-
-  if [[ "${UBUNTU_SETUP_INSTALL_OLLAMA:-}" == "1" ]]; then
-    echo "[UBUNTU SETUP] Installing Continue CLI tools for agentic coding and Rules CLI for creating agent rules..."
-    npm i -g @continuedev/cli rules-cli
   fi
 }
 
