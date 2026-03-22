@@ -53,7 +53,6 @@ function downloadAndExecute() {
   local fileName=${2:-}
   local controlHash=${3:-}
   local runAsRoot=${4:-}
-  local pipeCommands=${5:-}
 
   downloadAndVerify "$url" "$fileName" "$controlHash" true
   local tempFile=${UBUNTU_SETUP_LAST_DOWNLOADED_FILE:-}
@@ -64,18 +63,18 @@ function downloadAndExecute() {
   if [[ "$runAsRoot" == "true" ]]; then
     echo "Executing file '$tempFile' as root..."
 
-    if [[ "$pipeCommands" == "" ]]; then
-      sudo "$tempFile"
+    if [[ "$tempFile" == *".py" ]]; then
+      sudo python3 "$tempFile"
     else
-      echo "$pipeCommands" | sudo "$tempFile"
+      sudo "$tempFile"
     fi
   else
     echo "Executing file '$tempFile'..."
 
-    if [[ "$pipeCommands" == "" ]]; then
-      bash "$tempFile"
+    if [[ "$tempFile" == *".py" ]]; then
+      python3 "$tempFile"
     else
-      bash -c "echo \"$pipeCommands\" | \"$tempFile\""
+      bash "$tempFile"
     fi
   fi
 }
@@ -1024,6 +1023,15 @@ function installNodeJs() {
   fi
 }
 
+function installPdm() {
+  if ! command -v pdm &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Python Development Master (PDM)..."
+    downloadAndExecute https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py install-pdm.py 444f1f2b075f267d444ec3c28439a62ae34a85edb11595d93ac9a23e278a09751a7509be2762a9a2a53e7c7987c9cea53e14172f22bdc32bb44477c6ea8d7008
+  else
+    echo "[UBUNTU SETUP] Python Development Master (PDM) is already installed."
+  fi
+}
+
 function installGodot() {
   if ! command -v gdvm &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Godot Version Manager (gdvm)..."
@@ -1095,6 +1103,7 @@ function installDevTools() {
   sudo apt install -y build-essential gdb lldb shfmt
 
   installGit
+  installPdm
   installNodeJs
   installVsCode
 
