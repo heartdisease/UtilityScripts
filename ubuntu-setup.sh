@@ -558,11 +558,18 @@ models:
   - name: Qwen 2.5 Coder 7B
     provider: ollama
     model: $preferredModel
+    apiBase: http://localhost:11434
+    capabilities:
+      - tool_use
     roles:
       - chat
       - edit
       - autocomplete
-      - apply" | tee ~/.continue/config.yaml
+      - apply
+context:
+  - provider: diff
+  - provider: file
+  - provider: code" | tee ~/.continue/config.yaml
 
     # ensures Node.js is installed and installs Continue CLI
     installNodeJs
@@ -965,12 +972,26 @@ function installOllama() {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Ollama (local)",
       "options": {
-        "baseURL": "http://localhost:11434/v1"
+        "baseURL": "http://localhost:11434"
       },
       "models": {
         "'"$preferredModel"'": {
           "name": "Qwen2.5 Coder 7B (4k context)"
         }
+      }
+    },
+    "permission": {
+      "read": {
+        "*": "ask",
+        "*.env": "deny",
+        "*.env.example": "allow"
+      },
+      "edit": "ask",
+      "bash": {
+        "*": "ask",
+        "git *": "ask",
+        "rm *": "deny",
+        "rm -rf *": "deny"
       }
     }
   }

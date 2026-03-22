@@ -17,3 +17,5 @@ wordanalyzer/output.csv
 wordanalyzer/__pycache__
 
 restored/
+
+node_modules/
