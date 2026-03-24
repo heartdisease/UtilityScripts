@@ -328,8 +328,8 @@ function reconfigureVsCode() {
       jq '."editor.fontFamily" = "'\''SeriousShanns Nerd Font Mono'\'', '\''Droid Sans Mono'\'', monospace"' |
       jq '."github.copilot.nextEditSuggestions.enabled" = false' |
       jq '."terminal.integrated.defaultProfile.linux" = "fish"' |
-      jq '."typescript.tsserver.nodePath" = "'"$node_24"'"' |
-      jq '."typescript.tsserver.maxTsServerMemory" = 10240' |
+      jq '."js/ts.tsserver.node.path" = "'"$node_24"'"' |
+      jq '."js/ts.tsserver.maxMemory" = 10240' |
       jq '."vsicons.dontShowNewVersionMessage" = true' |
       jq '."window.zoomLevel" = 1.4' |
       jq '."workbench.colorTheme" = "Moonlight II"' |
