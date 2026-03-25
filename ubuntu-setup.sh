@@ -79,14 +79,24 @@ function downloadAndExecute() {
   fi
 }
 
+function appendUniqueTextToFile() {
+  local line=${1:-}
+  local filePath=${2:-}
+
+  if ! command -v rg &>/dev/null; then
+    sudo apt install -y ripgrep
+  fi
+
+  touch "$filePath"
+  if ! rg -qUF "$line" "$filePath"; then
+    printf '%s\n' "$line" >>"$filePath"
+  fi
+}
+
 function appendUniqueLineToBashrc() {
   local line=${1:-}
-  local bashrc="$HOME/.bashrc"
 
-  touch "$bashrc"
-  if ! grep -Fqx "$line" "$bashrc"; then
-    printf '%s\n' "$line" >>"$bashrc"
-  fi
+  appendUniqueTextToFile "$line" "$HOME/.bashrc"
 }
 
 function setGsettingIfSchemaExists() {
@@ -294,24 +304,26 @@ function reconfigureVsCode() {
   fi
 
   echo "Installing commonly used VSCode extensions..."
-  code --install-extension vscode-icons-team.vscode-icons
-  code --install-extension ms-vsliveshare.vsliveshare
+  code --install-extension eamodio.gitlens
+  code --install-extension redhat.vscode-yaml
   code --install-extension editorconfig.editorconfig
   code --install-extension sanaajani.taskrunnercode
-  code --install-extension eamodio.gitlens
+  code --install-extension yzhang.markdown-all-in-one
+  code --install-extension ms-vsliveshare.vsliveshare
+  code --install-extension vscode-icons-team.vscode-icons
 
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]] || [[ "${UBUNTU_SETUP_RECONFIGURE_LENAS_VSCODE:-}" == "1" ]]; then
     echo "Installing Lena's VSCode extensions <3..."
-    code --install-extension vitest.explorer
-    code --install-extension ms-playwright.playwright
-    code --install-extension esbenp.prettier-vscode
-    code --install-extension dbaeumer.vscode-eslint
-    code --install-extension rust-lang.rust-analyzer
-    code --install-extension mads-hartmann.bash-ide-vscode
-    code --install-extension timonwong.shellcheck
     code --install-extension mkhl.shfmt
+    code --install-extension vitest.explorer
     code --install-extension dohe.godot-format
     code --install-extension geequlim.godot-tools
+    code --install-extension timonwong.shellcheck
+    code --install-extension dbaeumer.vscode-eslint
+    code --install-extension esbenp.prettier-vscode
+    code --install-extension rust-lang.rust-analyzer
+    code --install-extension ms-playwright.playwright
+    code --install-extension mads-hartmann.bash-ide-vscode
 
     echo "Installing VSCode themes for Lena <3..."
     code --install-extension atomiks.moonlight
@@ -821,16 +833,16 @@ function installAndroidSdk() {
     export ANDROID_HOME="$HOME/.local/android/sdk"
     export ANDROID_SDK_ROOT="$ANDROID_HOME"
     export ANDROID_AVD_HOME="$HOME/.local/android/avd"
-    export PATH="$PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin"
+    export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
 
     # shellcheck disable=SC2016
-    appendUniqueLineToBashrc 'export ANDROID_HOME=$HOME/.local/android/sdk'
+    appendUniqueLineToBashrc 'export ANDROID_HOME="$HOME/.local/android/sdk"'
     # shellcheck disable=SC2016
-    appendUniqueLineToBashrc 'export ANDROID_SDK_ROOT=$ANDROID_HOME'
+    appendUniqueLineToBashrc 'export ANDROID_SDK_ROOT="$ANDROID_HOME"'
     # shellcheck disable=SC2016
-    appendUniqueLineToBashrc 'export ANDROID_AVD_HOME=$HOME/.local/android/avd'
+    appendUniqueLineToBashrc 'export ANDROID_AVD_HOME="$HOME/.local/android/avd"'
     # shellcheck disable=SC2016
-    appendUniqueLineToBashrc 'export PATH=$PATH:$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin'
+    appendUniqueLineToBashrc 'export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"'
 
     echo 'y' | sdkmanager "emulator" "platform-tools" "build-tools;36.0.0" "platforms;android-36" "system-images;android-36;google_apis;x86_64"
     echo 'no' | avdmanager create avd --force --name Pixel10_API36 --package "system-images;android-36;google_apis;x86_64"
@@ -994,7 +1006,7 @@ function installNodeJs() {
 
     # install script already registered fnm in ~/.bashrc for us,
     # but for whatever reason we cannot source it the current session
-    PATH=$PATH:~/.local/share/fnm
+    export PATH="$HOME/.local/share/fnm:$PATH"
 
     if ! command -v fnm; then
       echo "Failed to install Fast Node Manager (fnm). Abort."
@@ -1003,11 +1015,11 @@ function installNodeJs() {
 
     if command -v fish && [ -d ~/.config/fish/conf.d/ ]; then
       echo "Adding FNM env vars to Fish shell config..."
-      fnm env --use-on-cd --shell fish >>~/.config/fish/conf.d/fnm.fish
+      appendUniqueTextToFile "$(fnm env --use-on-cd --shell fish)" ~/.config/fish/conf.d/fnm.fish
     fi
     if command -v zsh &>/dev/null; then
       echo "Adding FNM env vars to ~/.zshrc..."
-      fnm env --use-on-cd --shell zsh >>~/.zshrc
+      appendUniqueTextToFile "$(fnm env --use-on-cd --shell zsh)" ~/.zshrc
     fi
   else
     echo "[UBUNTU SETUP] Fast Node Manager (fnm) is already installed."
@@ -1040,7 +1052,7 @@ function installGodot() {
 
     # install script already registered fnm in ~/.bashrc for us,
     # but for whatever reason we cannot source it the current session
-    PATH=$PATH:~/.gdvm/bin
+    export PATH="$HOME/.gdvm/bin:$PATH"
 
     if ! command -v gdvm; then
       echo "Failed to install Godot Version Manager (gdvm). Abort."
