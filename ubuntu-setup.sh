@@ -31,7 +31,7 @@ function downloadAndVerify() {
     echo "File '$downloadFile' already exists. Skip download."
   else
     echo "Downloading '$url' to '$downloadFile'..."
-    wget "$url" -qO "$downloadFile"
+    wget -q --show-progress "$url" -O "$downloadFile"
   fi
 
   fileHash=$(rhash --sha512 "$downloadFile" | grep -oE '^\w+')
@@ -272,7 +272,7 @@ EOF
 }
 
 function reconfigureVsCode() {
-  local node_24
+  local nodePath
 
   if [ -d ~/.vscode ]; then
     echo "Moving ~/.vscode to trash ..."
@@ -295,9 +295,11 @@ function reconfigureVsCode() {
     installNodeJs
   fi
 
-  fnm use 24
-  node_24="$FNM_DIR/node-versions/$(fnm current)/installation/bin/node"
-  if ! [ -x "$node_24" ]; then
+  fnm use 25
+  nodePath="$FNM_DIR/node-versions/$(fnm current)/installation/bin/node"
+  fnm use default
+
+  if ! [ -x "$nodePath" ]; then
     echo "Unexpected error: could not detect Node.js 24 executable!"
     echo "Abort."
     exit 1
@@ -340,7 +342,7 @@ function reconfigureVsCode() {
       jq '."editor.fontFamily" = "'\''SeriousShanns Nerd Font Mono'\'', '\''Droid Sans Mono'\'', monospace"' |
       jq '."github.copilot.nextEditSuggestions.enabled" = false' |
       jq '."terminal.integrated.defaultProfile.linux" = "fish"' |
-      jq '."js/ts.tsserver.node.path" = "'"$node_24"'"' |
+      jq '."js/ts.tsserver.node.path" = "'"$nodePath"'"' |
       jq '."js/ts.tsserver.maxMemory" = 10240' |
       jq '."vsicons.dontShowNewVersionMessage" = true' |
       jq '."window.zoomLevel" = 1.4' |
@@ -363,7 +365,7 @@ function reconfigureVsCode() {
       jq '."editor.bracketPairColorization.independentColorPoolPerBracketType" = true' |
       jq '."github.copilot.nextEditSuggestions.enabled" = false' |
       jq '."terminal.integrated.defaultProfile.linux" = "fish"' |
-      jq '."typescript.tsserver.nodePath" = "'"$node_24"'"' |
+      jq '."typescript.tsserver.nodePath" = "'"$nodePath"'"' |
       jq '."vsicons.dontShowNewVersionMessage" = true' |
       jq '."window.zoomLevel" = 1' |
       jq '."workbench.iconTheme" = "vscode-icons"' \
@@ -905,6 +907,7 @@ function installVeracrypt() {
 function installOllama() {
   if ! command -v ollama &>/dev/null; then
     local graphicsCardName
+    local preferredModel="qwen2.5-coder:7b-instruct-q4_K_M"
 
     echo "[UBUNTU SETUP] Installing Ollama..."
     downloadAndExecute https://ollama.com/install.sh install-ollama.sh 087e24f4444544e4387b669df0bf945cffcbbcdfd7f69e8bc5a980a51b0d2f024e16678b0c1a8f2fcca581f0984153127e75be9d6aa8294a0c97055755e55880
@@ -925,7 +928,7 @@ function installOllama() {
 
     if lspci | grep -i 'vga\|3d\|display' | grep -q '[GeForce RTX 2070 SUPER]'; then
       echo "[UBUNTU SETUP] Installing Qwen3-Coder (14B with Q4_K_M quantization; 4-bit, optimized for efficiency and performance) model for agentic coding..."
-      ollama pull "$UBUNTU_SETUP_PREFERRED_MODEL"
+      ollama pull "$preferredModel"
       ollama list
     else
       local encodedGraphicsCardName
@@ -941,6 +944,119 @@ function installOllama() {
   fi
 }
 
+function installLlamaCpp() {
+  if ! command -v llama-cli &>/dev/null; then
+    local llamaCppProjectDir="$HOME/Downloads/github/ggml-org/llama.cpp"
+
+    echo "[UBUNTU SETUP] Installing llama.cpp..."
+    sudo apt install -y git build-essential llvm clang g++-14 ccache cmake libssl-dev libopenblas-dev libcurl4-openssl-dev curl zlib1g-dev nvidia-cuda-toolkit
+
+    if [ -d "$llamaCppProjectDir" ]; then
+      cd "$llamaCppProjectDir"
+      git fetch
+    else
+      mkdir -p "$llamaCppProjectDir"
+      git clone https://github.com/ggml-org/llama.cpp.git "$llamaCppProjectDir"
+      cd "$llamaCppProjectDir"
+    fi
+
+    # check out latest release tag
+    git checkout "$(git describe --tags --abbrev=0 --match 'b*')"
+
+    cmake -B build -DBUILD_SHARED_LIBS=OFF -DGGML_BLAS=ON -DGGML_BLAS_VENDOR=OpenBLAS -DGGML_CUDA=ON
+    cmake --build build --config Release -j "$(nproc --all)"
+    sudo cmake --install build
+
+    if [ -f ~/.config/opencode/opencode.json ]; then
+      mv -f ~/.config/opencode/opencode.json ~/.config/opencode/opencode.json.bak
+      jq '.provider += {
+  "llama.cpp": {
+    "npm": "@ai-sdk/openai-compatible",
+    "name": "llama-server (local)",
+    "options": {
+      "baseURL": "http://localhost:8080/v1"
+    },
+    "models": {
+      "qwen3.5-9b-local": {
+        "name": "Qwen3.5 9B Q4_K_M (local)",
+        "limit": {
+          "context": 32768,
+          "output": 32768
+        }
+      }
+    }
+  }
+}' ~/.config/opencode/opencode.json.bak >~/.config/opencode/opencode.json
+    fi
+
+    if [ -f ~/.claude/settings.json ]; then
+      mv -f ~/.claude/settings.json ~/.claude/settings.json.bak
+      jq '.env += {
+    "ANTHROPIC_AUTH_TOKEN": "llama.cpp",
+    "ANTHROPIC_BASE_URL": "http://localhost:8080",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "CLAUDE_CODE_ATTRIBUTION_HEADER": "0"
+  }' ~/.claude/settings.json.bak >~/.claude/settings.json
+    fi
+
+    llama-cli --version
+
+    # llama-server --hf-repo 'Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF' --hf-file 'Qwen3.5-9B.Q4_K_M.gguf' --port 8080 \
+    #   -c 32768 \
+    #   -ngl 99 \
+    #   -fa on \
+    #   --no-mmproj \
+    #   --no-direct-io \
+    #   --jinja \
+    #   --temp 0.6 \
+    #   --top-p 0.95 \
+    #   --top-k 20 \
+    #   --presence-penalty 1.5 \
+    #   --repeat-penalty 1.0
+
+    # llama-server --hf-repo 'unsloth/Qwen3.5-9B-GGUF' --hf-file 'Qwen3.5-9B-Q4_K_M.gguf' --port 8080 \
+    #   -c 32768 \
+    #   -ngl 99 \
+    #   -fa on \
+    #   --no-mmproj \
+    #   --jinja \
+    #   --temp 0.6 \
+    #   --top-p 0.95 \
+    #   --top-k 20 \
+    #   --presence-penalty 1.5 \
+    #   --repeat-penalty 1.0
+    #   --chat-template-kwargs '{"enable_thinking":false}'
+
+    # llama-server --hf-repo 'bartowski/Qwen2.5-Coder-7B-Instruct-GGUF' --hf-file 'Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf' --port 8080 \
+    #   --jinja \
+    #   --no-direct-io \
+    #   --repeat-penalty 1.2 \
+    #   --temp 0.0 \
+    #   --top-p 0.95 \
+    #   --min-p 0.01 \
+    #   --top-k 40 \
+    #   -c 24576 \
+    #   -ngl 32 \
+    #   -fa on
+  else
+    echo "[UBUNTU SETUP] llama.cpp is already installed."
+  fi
+
+  echo Start llama-server on localhost:8080 with:
+  echo llama-server --hf-repo 'Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF' --hf-file 'Qwen3.5-9B.Q4_K_M.gguf' --port 8080 \
+    -c 32768 \
+    -ngl 99 \
+    -fa on \
+    --no-mmproj \
+    --no-direct-io \
+    --jinja \
+    --temp 0.6 \
+    --top-p 0.95 \
+    --top-k 20 \
+    --presence-penalty 1.5 \
+    --repeat-penalty 1.0
+}
+
 function installOpenCode() {
   if ! command -v opencode &>/dev/null; then
     echo "[UBUNTU SETUP] Installing OpenCode..."
@@ -948,28 +1064,12 @@ function installOpenCode() {
 
     if ! [ -d ~/.config/opencode ]; then
       mkdir ~/.config/opencode
-    fi
-
-    # shellcheck disable=SC2016
-    echo '{
+      # shellcheck disable=SC2016
+      echo '{
   "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "ollama": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Ollama (local)",
-      "options": {
-        "baseURL": "http://localhost:11434/v1"
-      },
-      "models": {
-        "'"$UBUNTU_SETUP_PREFERRED_MODEL"'": {
-          "name": "Qwen2.5 Coder 7B (4k context)"
-        }
-      }
-    }
-  }
+  "provider": {}
 }' | tee ~/.config/opencode/opencode.json
-
-    echo "You can now launch OpenCode via Ollama by running: ollama launch opencode --model $UBUNTU_SETUP_PREFERRED_MODEL"
+    fi
   else
     echo "[UBUNTU SETUP] OpenCode is already installed."
   fi
@@ -982,18 +1082,10 @@ function installClaudeCode() {
 
     if ! [ -d ~/.claude ]; then
       mkdir ~/.claude
-    fi
-
-    echo '{
-  "env": {
-    "ANTHROPIC_AUTH_TOKEN": "ollama",
-    "ANTHROPIC_BASE_URL": "http://localhost:11434",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "CLAUDE_CODE_ATTRIBUTION_HEADER": "0"
-  }
+      echo '{
+  "env": {}
 }' | tee ~/.claude/settings.json
-
-    echo "You can now launch Claude Code via Ollama by running: ollama launch claude --model $UBUNTU_SETUP_PREFERRED_MODEL"
+    fi
   else
     echo "[UBUNTU SETUP] Claude Code is already installed."
   fi
@@ -1027,9 +1119,13 @@ function installNodeJs() {
 
   if ! command -v node &>/dev/null || [[ "$(node -v)" != "v24."* ]]; then
     echo "[UBUNTU SETUP] Installing and activating Node.js 24 via fnm..."
+
     fnm install 24
-    fnm alias 24 default
+    fnm install 25
+    fnm default 24
     fnm use 24
+
+    npm i -g pnpm rimraf
   else
     echo "[UBUNTU SETUP] Node.js 24 is already installed via fnm, nothing to do."
   fi
@@ -1213,7 +1309,7 @@ function printHelpText() {
   echo "  -h, --help                      prints this help text"
   echo "  --basic-setup                   run only essential install and configure only the most relevant options"
   echo "  --lenas-setup                   run full install and configure all available options (except for openssh-server)"
-  echo "  --install-ollama                installs Ollama and sets up AI models and VSCode integration"
+  echo "  --install-local-ai              installs llama.cpp with OpenCode and Claude Code to run local AI models"
   echo "  --install-godot                 installs Godot 4.5 via Godot Version Manager (gdvm)"
   echo "  --install-openssh-server        installs openssh-server for local testing"
   echo "  --configure-gsettings           configures useful GNOME settings"
@@ -1252,8 +1348,8 @@ for arg in "$@"; do
     UBUNTU_SETUP_CONFIGURE_GSETTINGS=1
   elif [[ "$arg" == "--configure-lenas-gsettings" ]]; then
     UBUNTU_SETUP_CONFIGURE_LENAS_GSETTINGS=1
-  elif [[ "$arg" == "--install-ollama" ]]; then
-    UBUNTU_SETUP_INSTALL_OLLAMA=1
+  elif [[ "$arg" == "--install-local-ai" ]]; then
+    UBUNTU_SETUP_INSTALL_LOCAL_AI=1
   elif [[ "$arg" == "--install-godot" ]]; then
     UBUNTU_SETUP_INSTALL_GODOT=1
   elif [[ "$arg" == "--install-openssh-server" ]]; then
@@ -1303,20 +1399,20 @@ if [[ "${UBUNTU_SETUP_CONFIGURE_GSETTINGS:-}" == "1" ]] || [[ "${UBUNTU_SETUP_CO
   configureGnomeSettings
 fi
 
-if [[ "${UBUNTU_SETUP_INSTALL_OLLAMA:-}" == "1" ]]; then
+if [[ "${UBUNTU_SETUP_INSTALL_LOCAL_AI:-}" == "1" ]]; then
   if [[ "${UBUNTU_SETUP_BASIC_SETUP:-}" == "1" ]]; then
-    echo "Error: option --install-ollama is mutually exclusive with option --basic-setup"
+    echo "Error: option --install-local-ai is mutually exclusive with option --basic-setup"
     exit 1
   elif [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
-    echo "Error: option --install-ollama is mutually exclusive with option --lenas-setup"
+    echo "Error: option --install-local-ai is mutually exclusive with option --lenas-setup"
     exit 1
   else
-    UBUNTU_SETUP_PREFERRED_MODEL="qwen2.5-coder:7b-instruct-q4_K_M"
-
-    installOllama
+    installNodeJs
     installOpenCode
     installClaudeCode
-    installVsCode
+    installLlamaCpp
+    #installOllama
+    #installVsCode
   fi
 fi
 
