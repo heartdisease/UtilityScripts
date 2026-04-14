@@ -216,9 +216,20 @@ function reconfigureGit() {
   git config --global core.editor "code --wait"
   git config --global core.autocrlf input
   git config --global credential.helper /usr/share/doc/git/contrib/credential/libsecret/git-credential-libsecret
+  git config --global pull.rebase true
 
-  cat <<EOF >>~/.gitconfig
+  git config --global core.pager delta
+  git config --global interactive.diffFilter "delta --color-only"
+  git config --global delta.navigate true # jump through files with 'n' and 'N'
+  git config --global delta.light false   # set to 'true' in case you use a light terminal theme
+  git config --global merge.conflictstyle zdiff3
 
+  git config --global alias.dft "diff --tool=difftastic"
+  # shellcheck disable=SC2016
+  git config --global difftool.difftastic.cmd 'difft "$LOCAL" "$REMOTE"'
+  git config --global pager.difftool true
+
+  echo "
 ### Copied from: https://blog.gitbutler.com/how-git-core-devs-configure-git ###
 
 # clearly makes git better
@@ -263,12 +274,7 @@ function reconfigureGit() {
 [core]
 	# fsmonitor = true
 	# untrackedCache = true
-[merge]
-	# (just 'diff3' if git version < 2.3)
-	conflictstyle = zdiff3
-[pull]
-	rebase = true
-EOF
+" >>~/.gitconfig
 }
 
 function reconfigureVsCode() {
@@ -553,14 +559,6 @@ Signed-By: /usr/share/keyrings/microsoft.gpg
     reconfigureVsCode
   else
     echo "[UBUNTU SETUP] VSCode is already installed. Nothing to do."
-  fi
-
-  if [[ "${UBUNTU_SETUP_INSTALL_OLLAMA:-}" == "1" ]]; then
-    # install useful CLI tools for Copilot
-    sudo apt install -y jq fdclone bat git-delta shellcheck hyperfine entr tree ripgrep
-
-    echo "[UBUNTU SETUP] Installing OpenCode extension for VSCode..."
-    code --install-extension sst-dev.opencode
   fi
 }
 
@@ -1181,11 +1179,10 @@ function installGodot() {
 
 function installRust() {
   if ! command -v rustup &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Rustup..."
-    sudo apt install -y curl
-
-    # TODO use downloadAndExecute with checksum instead
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    echo "[UBUNTU SETUP] Installing Rust..."
+    downloadAndVerify https://sh.rustup.rs install-rustup.sh cd9fd64eabc989f19a6a16e9cd2caabe935082e2715b9308150f86d3839c99eb9a7e42a7ef6730c6d956d870638ee89a04dd9e7e14fe243cc165967b7f2918da true
+    chmod +x "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE"
+    sh "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE" -y
     # shellcheck disable=SC1090
     source ~/.cargo/env
 
@@ -1199,7 +1196,27 @@ function installRust() {
 function installGit() {
   if ! command -v git &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Git..."
-    sudo apt install -y git fish zsh
+    sudo apt install -y git fzf
+    installRust
+    cargo install ripgrep fd-find bat git-delta eza watchexec-cli difftastic
+
+    echo "
+#alias fd='fdfind'
+#alias bat='batcat'
+
+# use eza as ls-replacement with icons and details
+if command -v eza >/dev/null 2>&1; then
+  alias ls='eza --icons --group-directories-first'
+  alias ll='eza -lh --icons --group-directories-first'
+fi
+
+# replace cat with bat (for syntax highlighting)
+alias cat='batcat -pp'
+
+# switch branches interactively with fzf
+alias gcb='git branch -a | fzf | xargs git checkout'
+" >>~/.bashrc
+
     reconfigureGit
   else
     echo "[UBUNTU SETUP] Git is already installed. Nothing to do."
@@ -1208,15 +1225,19 @@ function installGit() {
 
 function installDevTools() {
   echo "[UBUNTU SETUP] Installing essential dev-tools..."
-  sudo apt install -y build-essential gdb lldb shfmt
+  sudo apt install -y fish zsh build-essential gdb lldb shfmt
 
   installGit
   installPdm
+  installRust
   installNodeJs
   installVsCode
 
+  # install cli tools frequently used by AI agents
+  sudo apt install -y jq fzf
+  cargo install ripgrep fd-find bat eza sd tokei hyperfine du-dust duf procs xh watchexec-cli git-delta difftastic ast-grep
+
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
-    installRust
     installJava
     installGradle
     installAndroidSdk
@@ -1412,7 +1433,6 @@ if [[ "${UBUNTU_SETUP_INSTALL_LOCAL_AI:-}" == "1" ]]; then
     installClaudeCode
     installLlamaCpp
     #installOllama
-    #installVsCode
   fi
 fi
 
