@@ -381,7 +381,7 @@ function reconfigureVsCode() {
 
 function installCommandlineBasics() {
   echo "[UBUNTU SETUP] Install basic command line utilities..."
-  sudo apt install -y fish curl net-tools plocate rhash pwgen p7zip-full rar optipng pdftk-java libsecret-tools mesa-utils apt-transport-https texlive-extra-utils texlive-latex-recommended
+  sudo apt install -y apt-transport-https libsecret-tools mesa-utils curl net-tools plocate rhash pwgen fish p7zip-full rar imagemagick optipng pdftk-java yt-dlp texlive-latex-recommended texlive-extra-utils
 }
 
 function installSystemUtils() {
@@ -730,6 +730,20 @@ function installBrave() {
   fi
 }
 
+function installEdge() {
+  if ! command -v microsoft-edge &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Microsoft Edge..."
+    sudo apt install -y curl
+
+    curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/edge stable main" | sudo tee /etc/apt/sources.list.d/microsoft-edge.list
+    sudo apt update
+    sudo apt install -y microsoft-edge-stable
+  else
+    echo "[UBUNTU SETUP] Microsoft Edge is already installed. Nothing to do."
+  fi
+}
+
 function installSignal() {
   if ! command -v signal-desktop &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Signal..."
@@ -852,43 +866,13 @@ function installAndroidSdk() {
   fi
 }
 
-function installOpenSshServer() {
-  local sftpUser=sftpuser
-  local sftpHome="/home/$sftpUser"
-  local sshdConfigDropIn=/etc/ssh/sshd_config.d/ubuntu-setup-sftpuser.conf
-
-  echo "[UBUNTU SETUP] Installing OpenSSH Server..."
-  sudo apt install -y openssh-server
-
-  if ! id "$sftpUser" &>/dev/null; then
-    echo "[UBUNTU SETUP] Creating SFTP-only user '$sftpUser'..."
-    sudo useradd -m -d "$sftpHome" -s /usr/sbin/nologin "$sftpUser"
-    sudo passwd "$sftpUser"
+function installPodman() {
+  if ! command -v podman &>/dev/null || ! command -v podman-compose &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Podman..."
+    sudo apt install -y podman podman-compose
   else
-    echo "[UBUNTU SETUP] SFTP-only user '$sftpUser' already exists."
+    echo "[UBUNTU SETUP] Podman is already installed. Nothing to do."
   fi
-
-  # Configure chroot jail via a managed drop-in file.
-  sudo mkdir -p /etc/ssh/sshd_config.d
-  cat <<EOF | sudo tee "$sshdConfigDropIn" >/dev/null
-Match User sftpuser
-    ChrootDirectory /home/sftpuser
-    ForceCommand internal-sftp
-    AllowTcpForwarding no
-    X11Forwarding no
-EOF
-
-  # Set proper permissions for the chroot and writable upload directory.
-  sudo mkdir -p "$sftpHome"
-  sudo chown root:root "$sftpHome"
-  sudo chmod 755 "$sftpHome"
-  sudo mkdir -p "$sftpHome/uploads"
-  sudo chown "$sftpUser:$sftpUser" "$sftpHome/uploads"
-
-  sudo systemctl restart ssh
-
-  # Test the connection from a client:
-  # sftp -v sftpuser@localhost
 }
 
 function installVeracrypt() {
@@ -999,7 +983,7 @@ function installLlamaCpp() {
 
     llama-cli --version
 
-    # llama-server --hf-repo 'Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF' --hf-file 'Qwen3.5-9B.Q4_K_M.gguf' --port 8080 \
+    # llama-server --hf-repo 'bartowski/google_gemma-4-E4B-it-GGUF' --hf-file 'google_gemma-4-E4B-it-Q4_K_M.gguf' --port 8080 \
     #   -c 32768 \
     #   -ngl 99 \
     #   -fa on \
@@ -1007,6 +991,19 @@ function installLlamaCpp() {
     #   --no-direct-io \
     #   --jinja \
     #   --temp 0.6 \
+    #   --top-p 0.95 \
+    #   --top-k 20 \
+    #   --presence-penalty 1.5 \
+    #   --repeat-penalty 1.0
+
+    # llama-server --hf-repo 'Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF' --hf-file 'Qwen3.5-9B.Q4_K_M.gguf' --port 8080 \
+    #   -c 32768 \
+    #   -ngl 99 \
+    #   -fa on \
+    #   --no-mmproj \
+    #   --no-direct-io \
+    #   --jinja \
+    #   --temp 0.4 \
     #   --top-p 0.95 \
     #   --top-k 20 \
     #   --presence-penalty 1.5 \
@@ -1048,7 +1045,7 @@ function installLlamaCpp() {
     --no-mmproj \
     --no-direct-io \
     --jinja \
-    --temp 0.6 \
+    --temp 0.4 \
     --top-p 0.95 \
     --top-k 20 \
     --presence-penalty 1.5 \
@@ -1119,11 +1116,17 @@ function installNodeJs() {
     echo "[UBUNTU SETUP] Installing and activating Node.js 24 via fnm..."
 
     fnm install 24
+    fnm use 24
+    npm i -g pnpm rimraf corepack
+    corepack enable
+
     fnm install 25
+    fnm use 25
+    npm i -g pnpm rimraf corepack
+    corepack enable
+
     fnm default 24
     fnm use 24
-
-    npm i -g pnpm rimraf
   else
     echo "[UBUNTU SETUP] Node.js 24 is already installed via fnm, nothing to do."
   fi
@@ -1288,8 +1291,10 @@ function startUbuntuSetup() {
   installTorBrowser
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     installBrave
+    installEdge
     installSignal
     installVeracrypt
+    installPodman
   fi
 
   # install gaming setup
@@ -1456,7 +1461,9 @@ if [[ "${UBUNTU_SETUP_INSTALL_OPENSSH_SERVER:-}" == "1" ]]; then
     echo "Error: option --install-openssh-server is mutually exclusive with option --lenas-setup"
     exit 1
   else
-    installOpenSshServer
+    echo OpenSSH server installer is not yet implemented!
+    #installOpenSshServer
+    exit 1
   fi
 fi
 
