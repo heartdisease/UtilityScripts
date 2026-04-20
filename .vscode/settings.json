@@ -13,5 +13,225 @@
   },
   "[shellscript]": {
     "editor.defaultFormatter": "mkhl.shfmt"
-  }
+  },
+  "chat.tools.terminal.autoApprove": {
+    // ── File & Directory Inspection ──
+    "ls": true,
+    "eza": true,
+    "exa": true,
+    // tree: any args except -o/--output (blocks writing output to file); no shell metachars
+    "/^tree(?:\\s+(?!-o\\b|--output\\b)[^;&|><`$()]+)*\\s*$/": true,
+    "stat": true,
+    "file": true,
+    "bat": true,
+    "cat": true,
+    "head": true,
+    "tail": true,
+    "less": false,
+    "more": false,
+    "wc": true,
+    "du": true,
+    "dust": true,
+    "df": true,
+    "duf": true,
+    "realpath": true,
+    "basename": true,
+    "dirname": true,
+    "readlink": true,
+    "Get-ChildItem": true,
+    "Get-Content": true,
+    "Get-Date": true,
+    "Get-Random": true,
+    "Get-Location": true,
+    "Set-Location": true,
+    "Write-Host": true,
+    "Write-Output": true,
+    "Out-String": true,
+    "Split-Path": true,
+    "Join-Path": true,
+    "Start-Sleep": true,
+    "Where-Object": true,
+    // Select-Object/String/Xml: property filter, regex file search, XML reader — all read-only
+    "/^Select-(?:Object|String|Xml)\\b(?:\\s+[^;&|><`$()]+)*\\s*$/i": true,
+    // Measure-Object only: counts/aggregates pipeline input. Measure-Command is excluded because it executes its script block.
+    "/^Measure-Object\\b(?:\\s+[^;&|><`$()]+)*\\s*$/i": true,
+    // Compare-Object: diffs two object sets, read-only
+    "/^Compare-Object\\b(?:\\s+[^;&|><`$()]+)*\\s*$/i": true,
+    // Format-List/Table/Wide/Custom/Hex: output formatting cmdlets, read-only
+    "/^Format-(?:List|Table|Wide|Custom|Hex)\\b(?:\\s+[^;&|><`$()]+)*\\s*$/i": true,
+    // Sort-Object: sorts pipeline input, read-only
+    "/^Sort-Object\\b(?:\\s+[^;&|><`$()]+)*\\s*$/i": true,
+
+    // ── Search & Pattern Matching ──
+    "rg": true,
+    "grep": true,
+    "egrep": true,
+    "fgrep": true,
+    // fd: any args except -x/-X/--exec/--exec-batch (blocks arbitrary command execution on matches)
+    "/^fd\\b(?!.*(?:^|\\s)(?:-x|-X|--exec|--exec-batch)\\b)(?:\\s+[^;&|><`$()]+)*\\s*$/": true,
+    // find: any args except -exec/-execdir/-ok/-okdir (exec), -delete (delete), -fprint*/-fls (file write), -files0-from (file input)
+    "/^find\\b(?!.*(?:^|\\s)-(?:exec|execdir|ok|okdir|delete|fprint|fprint0|fprintf|fls|files0-from)\\b)(?:\\s+(?:'[^']*'|\"[^\"]*\"|[^\\s;&|><`$]+))*\\s*$/": true,
+    "locate": true,
+    "which": true,
+    "whereis": true,
+    "type": true,
+    "command -v": true,
+    "fzf": false,
+    "ag": true,
+    // ast-grep sg: --pattern search only; blocks --rewrite/--replace/--update-all (which mutate files)
+    "/^sg\\s+--pattern\\b(?!.*\\s(?:--rewrite|--replace|--update-all)\\b)(?:\\s+[^;&|><`$()]+)*\\s*$/": true,
+    // ast-grep scan: rule-based scan, read-only
+    "/^ast-grep\\s+scan\\b(?:\\s+[^;&|><`$()]+)*\\s*$/": true,
+
+    // ── Text Processing (stdout only, no file mutation) ──
+    // awk: optional -F/-v flags and a quoted program; blocks system()/getline (command/file I/O) and > or | (redirection/pipe to command) inside the program
+    "/^awk(?:\\s+(?:-F\\s+(?:'[^']*'|\"[^\"]*\"|[^\\s;&|><`$]+)|-v\\s+[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|\"[^\"]*\"|[^\\s;&|><`$]+)))*\\s+(?:'(?:(?!\\b(?:system|getline)\\b|[>|]).)*'|\"(?:(?!\\b(?:system|getline)\\b|[>|]).)*\")(?:\\s+(?:'[^']*'|\"[^\"]*\"|[^\\s;&|><`$]+))*\\s*$/i": true,
+    // sed -n: print-only; script must be a quoted line-address (digit, range, /pattern/, or /pat1/,/pat2/) followed by 'p'. Blocks w/W (file write), e (exec), and s///e flag.
+    "/^sed\\s+-n\\s+(?:'(?:\\d+(?:,\\d+)?|\\/[^\\/]+\\/(?:,\\/[^\\/]+\\/)?)p'|\"(?:\\d+(?:,\\d+)?|\\/[^\\/]+\\/(?:,\\/[^\\/]+\\/)?)p\")(?:\\s+[^\\s;&|><`$()]+)*\\s*$/": true,
+    "sort": true,
+    "uniq": true,
+    "cut": true,
+    "paste": true,
+    "tr": true,
+    "column": true,
+    "fmt": true,
+    "fold": true,
+    "rev": true,
+    "tac": true,
+    "nl": true,
+    "comm": true,
+    "diff": true,
+    "difft": true,
+    "delta": true,
+    "sd": false,
+    "colordiff": true,
+    "xxd": true,
+    "od": true,
+    "hexdump": true,
+    // md5/sha1/sha256/sha512/b2 sum: read-only hashing of files or stdin
+    "/^(md5|sha1|sha256|sha512|b2)sum\\b(?:\\s+[^;&|><`$()]+)*\\s*$/": true,
+
+    // ── JSON / YAML / Data Processing ──
+    "jq": true,
+    // yq: any args except -i/--inplace (blocks in-place file mutation)
+    "/^yq\\b(?!.*(?:^|\\s)(?:-i|--inplace)\\b)(?:\\s+[^;&|><`$()]+)*\\s*$/": true,
+    // xq: any args except -i/--inplace (blocks in-place file mutation)
+    "/^xq\\b(?!.*(?:^|\\s)(?:-i|--inplace)\\b)(?:\\s+[^;&|><`$()]+)*\\s*$/": true,
+
+    // ── Git (read-only operations only) ──
+    // git read-only verbs: status, log, diff, show, rev-parse, ls-files, blame, shortlog, describe, reflog
+    "/^git\\s+(?:--no-pager\\s+)?(?:status|log|diff|show|rev-parse|ls-files|blame|shortlog|describe|reflog)\\b(?:\\s+[^;&|><`$()]+)*\\s*$/": true,
+    // git branch: listing-only flags (no positional branch name → no creation/deletion/rename)
+    "/^git\\s+(?:--no-pager\\s+)?branch(?:\\s+(?:-l|--list|-a|-r|--all|--remotes|--show-current|-v|-vv|--verbose|--color|--no-color|--column|--no-column|--merged|--no-merged))*\\s*$/": true,
+    // git tag: bare invocation lists tags; otherwise requires -l/--list with optional glob pattern(s). Blocks tag creation/deletion.
+    "/^git\\s+(?:--no-pager\\s+)?tag(?:\\s+(?:-l|--list)(?:\\s+(?:'[^']*'|\"[^\"]*\"|[^\\s;&|><`$()-]+))*)?\\s*$/": true,
+    // git remote: -v (list URLs), show <name>, or get-url <name> — no add/remove/set-url
+    "/^git\\s+(?:--no-pager\\s+)?remote(?:\\s+-v|\\s+show\\s+[^;&|><`$()]+|\\s+get-url\\s+[^;&|><`$()]+)?\\s*$/": true,
+    // git stash list: read-only stash listing
+    "/^git\\s+(?:--no-pager\\s+)?stash\\s+list\\b(?:\\s+[^;&|><`$()]+)*\\s*$/": true,
+    // git config --get: read-only config lookup (blocks --set/--unset/--add/--replace-all)
+    "/^git\\s+config\\s+--get\\b(?:\\s+[^;&|><`$()]+)*\\s*$/": true,
+
+    // ── System / Environment Info ──
+    "env": false,
+    "printenv": false,
+    "echo": true,
+    "printf": true,
+    "uname": true,
+    "hostname": true,
+    "whoami": true,
+    "id": true,
+    "date": true,
+    "uptime": true,
+    "free": true,
+    "lscpu": true,
+    "nproc": true,
+    "arch": true,
+    "locale": true,
+    "getconf": true,
+
+    // ── Process Inspection ──
+    "ps": true,
+    "procs": true,
+    "top -bn1": true,
+    "pgrep": true,
+    "lsof": true,
+    "ss": true,
+    "netstat": true,
+
+    // ── Node / Package Manager (read-only + project lint/format/test scripts) ──
+    // node --version: version check only
+    "/^node\\s+--version\\s*$/": true,
+    // pnpm run: allowlist of project scripts (prettier/lint/eslint/stylelint/typecheck/test); some mutate files in place by design
+    "/^pnpm\\s+run\\s+(prettier|lint|eslint|stylelint|typecheck|test)\\b/": true,
+    // pnpm list: read-only dependency tree listing (recursive/depth/json/long/filter flags)
+    "/^pnpm\\s+list(?:\\s+(?:-r|--recursive|--depth(?:=|\\s+)\\d+|--json|--long))*(?:\\s+--filter(?:=|\\s+)[^;&|><`$()]+)?\\s*$/": true,
+    // pnpm why: read-only dependency-reason lookup for one or more package names
+    "/^pnpm\\s+why(?:\\s+(?:-r|--recursive|--depth(?:=|\\s+)\\d+|--json))*(?:\\s+--filter(?:=|\\s+)[^;&|><`$()]+)?\\s+[@a-z0-9._/-]+(?:\\s+[@a-z0-9._/-]+)*\\s*$/i": true,
+    // pnpm exec: denied — runs arbitrary binaries from node_modules
+    "/^pnpm\\s+exec\\b/": false,
+    // npm ls: read-only dependency tree listing
+    "/^npm\\s+ls(?:\\s+(?:--json|--long|--parseable|--all|--depth(?:=|\\s+)\\d+))*(?:\\s+[@a-z0-9._/-]+(?:\\s+[@a-z0-9._/-]+)*)?\\s*$/i": true,
+    // npm explain: read-only dependency-reason lookup for a given package
+    "/^npm\\s+explain(?:\\s+(?:--json|--workspace(?:=|\\s+)[^;&|><`$()]+))*(?:\\s+[@a-z0-9._/-]+(?:\\s+[@a-z0-9._/-]+)*)\\s*$/i": true,
+    // npx --no-install --yes: only runs tokei/scc (code counters); --no-install blocks downloading new packages
+    "/^npx\\s+--no-install\\s+--yes\\s+(tokei|scc)(?:\\s+(?:--no-header|--by-file|--include-lang(?:=|\\s+)[^;&|><`$()]+|--exclude-dir(?:=|\\s+)[^;&|><`$()]+|--format(?:=|\\s+)[^;&|><`$()]+|--sort(?:=|\\s+)[^;&|><`$()]+|--files))*(?:\\s+--)?(?:\\s+[^;&|><`$()]+)*\\s*$/": true,
+
+    // ── Misc Utility ──
+    "test": true,
+    "true": true,
+    "false": true,
+    "seq": true,
+    "time": false,
+    "hyperfine": false,
+    "tokei": true,
+    "scc": true,
+    "xargs": false,
+    "xh": false,
+    "watchexec": false,
+
+    // ── Explicit Deny (destructive / write / network commands) ──
+    "rm": false,
+    "rmdir": false,
+    "del": false,
+    "mv": false,
+    "cp": false,
+    "ln": false,
+    "dd": false,
+    "kill": false,
+    "killall": false,
+    "pkill": false,
+    "curl": false,
+    "wget": false,
+    "eval": false,
+    "chmod": false,
+    "chown": false,
+    "chgrp": false,
+    "sudo": false,
+    "mkfs": false,
+    "mount": false,
+    "umount": false,
+    "reboot": false,
+    "shutdown": false,
+    "systemctl": false,
+    "ssh": false,
+    "scp": false,
+    "rsync": false,
+    "docker": false,
+    "podman": false,
+    "taskkill": false,
+    "taskkill.exe": false,
+    // git mutating verbs: push/commit/reset/checkout/clean/rebase/merge/cherry-pick — always denied
+    "/^git\\s+(push|commit|reset|checkout|clean|rebase|merge|cherry-pick)\\b(?:\\s+.*)?$/": false,
+    // pnpm/npm/pip(3) install: denied — blocks adding new dependencies without explicit approval
+    "/^(pnpm|npm|pip3?)\\s+install\\b(?:\\s+.*)?$/": false,
+    "Set-Acl": false,
+    "Remove-Item": false,
+    "Stop-Process": false,
+    "Set-ItemProperty": false,
+    "Invoke-RestMethod": false,
+    "Invoke-WebRequest": false,
+    "Invoke-Expression": false
+  },
+  "chat.tools.terminal.blockDetectedFileWrites": "all"
 }

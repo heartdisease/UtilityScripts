@@ -1,9 +1,9 @@
 {
   "recommendations": [
-    "eamodio.gitlens",
-    "editorconfig.editorconfig",
-    "mads-hartmann.bash-ide-vscode",
-    "timonwong.shellcheck",
     "mkhl.shfmt",
+    "eamodio.gitlens",
+    "timonwong.shellcheck",
+    "editorconfig.editorconfig",
+    "mads-hartmann.bash-ide-vscode"
   ]
 }
