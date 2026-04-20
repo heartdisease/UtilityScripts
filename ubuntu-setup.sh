@@ -379,9 +379,18 @@ function reconfigureVsCode() {
   fi
 }
 
+function installEssentials() {
+  echo "[UBUNTU SETUP] Install essential command line utilities..."
+  sudo apt install -y apt-transport-https ca-certificates curl gpg
+}
+
 function installCommandlineBasics() {
   echo "[UBUNTU SETUP] Install basic command line utilities..."
-  sudo apt install -y apt-transport-https libsecret-tools mesa-utils curl net-tools plocate rhash pwgen fish p7zip-full rar imagemagick optipng pdftk-java yt-dlp texlive-latex-recommended texlive-extra-utils
+  sudo apt install -y libsecret-tools mesa-utils \
+    net-tools plocate rhash pwgen \
+    unzip zstd tar bzip2 xz-utils brotli rar unrar p7zip-full \
+    imagemagick optipng pdftk-java texlive-latex-recommended texlive-extra-utils \
+    fish yt-dlp
 }
 
 function installSystemUtils() {
@@ -389,7 +398,21 @@ function installSystemUtils() {
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     sudo apt install -y keepass2
   fi
-  sudo apt install -y gparted usb-creator-gtk
+  sudo apt install -y file-roller gparted usb-creator-gtk
+
+  # open all archive files with file-roller instead of nautilus
+  for mime in \
+    application/zip \
+    application/x-7z-compressed \
+    application/x-rar \
+    application/x-tar \
+    application/gzip \
+    application/x-bzip2 \
+    application/x-xz \
+    application/zstd \
+    application/vnd.rar; do
+    echo xdg-mime default org.gnome.FileRoller.desktop "$mime"
+  done
 }
 
 function installMultimediaUtils() {
@@ -540,11 +563,7 @@ function installSpotify() {
 function installVsCode() {
   if ! command -v code &>/dev/null; then
     echo "[UBUNTU SETUP] Installing VSCode..."
-    # update your package list and install required packages
-    sudo apt install -y curl gpg
-    # download and install the Microsoft GPG key
     curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
-    # create the repository configuration file
     echo "Types: deb
 URIs: https://packages.microsoft.com/repos/code
 Suites: stable
@@ -719,8 +738,6 @@ function installTorBrowser() {
 function installBrave() {
   if ! command -v brave &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Brave..."
-    sudo apt install -y curl
-
     sudo curl -fsSLo /usr/share/keyrings/brave-browser-archive-keyring.gpg https://brave-browser-apt-release.s3.brave.com/brave-browser-archive-keyring.gpg
     sudo curl -fsSLo /etc/apt/sources.list.d/brave-browser-release.sources https://brave-browser-apt-release.s3.brave.com/brave-browser.sources
     sudo apt update
@@ -733,8 +750,6 @@ function installBrave() {
 function installEdge() {
   if ! command -v microsoft-edge &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Microsoft Edge..."
-    sudo apt install -y curl
-
     curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/edge stable main" | sudo tee /etc/apt/sources.list.d/microsoft-edge.list
     sudo apt update
@@ -766,8 +781,6 @@ function installSignal() {
 function installSteam() {
   if ! command -v steam &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Steam..."
-    sudo apt install -y curl gpg
-
     curl -fsSL https://repo.steampowered.com/steam/archive/stable/steam.gpg | sudo gpg --dearmor -o /usr/share/keyrings/steam.gpg
     echo "Types: deb
 URIs: https://repo.steampowered.com/steam/
@@ -794,6 +807,27 @@ Signed-By: /usr/share/keyrings/steam.gpg" | sudo tee /etc/apt/sources.list.d/ste
     installProtonUp
   else
     echo "[UBUNTU SETUP] Steam is already installed. Nothing to do."
+  fi
+}
+
+function installPython() {
+  if ! command -v uv &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing uv..."
+    downloadAndExecute https://astral.sh/uv/install.sh install-uv.sh 4044482e2a46515babaa60d61d396bbe1dd16683337d7a1c7646acd48384d31b217eddc13089d52ebaf1a18d10aa81fd894ae43932b2c2a4577d2c2943748b2d
+
+    echo "[UBUNTU SETUP] Installing Python 3.12 via uv..."
+    uv python install --default 3.12
+    uv tool install ruff
+    uv tool install ty
+  else
+    echo "[UBUNTU SETUP] Python and uv are already installed. Nothing to do."
+  fi
+
+  if ! command -v pdm &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Python Development Master (PDM)..."
+    downloadAndExecute https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py install-pdm.py 444f1f2b075f267d444ec3c28439a62ae34a85edb11595d93ac9a23e278a09751a7509be2762a9a2a53e7c7987c9cea53e14172f22bdc32bb44477c6ea8d7008
+  else
+    echo "[UBUNTU SETUP] Python Development Master (PDM) is already installed. Nothing to do."
   fi
 }
 
@@ -875,6 +909,27 @@ function installPodman() {
   fi
 }
 
+function installOpenWebUi() {
+  echo "[UBUNTU SETUP] Installing Open WebUI..."
+  echo "Open WebUI setup is not yet implemented!"
+  # TODO: implement with Podman
+  exit 1
+}
+
+function installOpenSshServer() {
+  echo "[UBUNTU SETUP] Installing OpenSSH Server..."
+  echo "OpenSSH Server setup is not yet implemented!"
+  # TODO: implement with Podman
+  exit 1
+}
+
+function installGitea() {
+  echo "[UBUNTU SETUP] Installing Gitea..."
+  echo "Gitea setup is not yet implemented!"
+  # TODO: implement with Podman
+  exit 1
+}
+
 function installVeracrypt() {
   if ! command -v veracrypt &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Veracrypt..."
@@ -931,7 +986,7 @@ function installLlamaCpp() {
     local llamaCppProjectDir="$HOME/Downloads/github/ggml-org/llama.cpp"
 
     echo "[UBUNTU SETUP] Installing llama.cpp..."
-    sudo apt install -y git build-essential llvm clang g++-14 ccache cmake libssl-dev libopenblas-dev libcurl4-openssl-dev curl zlib1g-dev nvidia-cuda-toolkit
+    sudo apt install -y git build-essential llvm clang g++-14 ccache cmake libssl-dev libopenblas-dev libcurl4-openssl-dev zlib1g-dev nvidia-cuda-toolkit
 
     if [ -d "$llamaCppProjectDir" ]; then
       cd "$llamaCppProjectDir"
@@ -1132,51 +1187,21 @@ function installNodeJs() {
   fi
 }
 
-function installPdm() {
-  if ! command -v pdm &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Python Development Master (PDM)..."
-    downloadAndExecute https://raw.githubusercontent.com/pdm-project/pdm/main/install-pdm.py install-pdm.py 444f1f2b075f267d444ec3c28439a62ae34a85edb11595d93ac9a23e278a09751a7509be2762a9a2a53e7c7987c9cea53e14172f22bdc32bb44477c6ea8d7008
-  else
-    echo "[UBUNTU SETUP] Python Development Master (PDM) is already installed."
-  fi
-}
-
 function installGodot() {
-  if ! command -v gdvm &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Godot Version Manager (gdvm)..."
-    downloadAndExecute https://gdvm.io/install.sh install-gdvm.sh 66d6aa651ff5bbe149e4d8ac6f21e61da799ffd328b359c13efed5adddae3ac7feb5fc6525e71ae3bd96d983a71a4c51ec90600333cca34d1edbc6ff64d85f3c
-    # TODO find a way to suppress user prompt (should choose 'N')
-
-    # install script already registered fnm in ~/.bashrc for us,
-    # but for whatever reason we cannot source it the current session
-    export PATH="$HOME/.gdvm/bin:$PATH"
-
-    if ! command -v gdvm; then
-      echo "Failed to install Godot Version Manager (gdvm). Abort."
-      exit 1
-    fi
+  if ! command -v fgvm &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Friendly Godot Version Manager (fgvm)..."
+    echo "fgvm setup is not yet implemented!"
+    exit 1
   else
-    echo "[UBUNTU SETUP] Godot Version Manager (gdvm) is already installed."
+    echo "[UBUNTU SETUP] Friendly Godot Version Manager (fgvm) is already installed."
   fi
 
   if ! command -v godot &>/dev/null || [[ "$(godot --version 2>/dev/null)" != "4.5."* ]]; then
-    local currentGodotExec
-    local currentGodotHome
-
-    echo "[UBUNTU SETUP] Installing and activating Godot 4.5 via gdvm..."
-    gdvm use 4.5
-
-    currentGodotExec=$(gdvm show)
-    currentGodotHome=$(dirname "$currentGodotExec")
-
-    # add hard link to Godot executable so tools can find it
-    ln "$currentGodotExec" "$currentGodotHome/godot"
-
-    echo "Adding GODOT_HOME to ~/.bashrc..."
-    export GODOT_HOME="$currentGodotHome"
-    appendUniqueLineToBashrc 'export GODOT_HOME="'"$currentGodotHome"'"'
+    echo "[UBUNTU SETUP] Installing and activating latest Godot version via fgvm..."
+    fgvm install 4.5-stable
+    fgvm set 4.5-stable
   else
-    echo "[UBUNTU SETUP] Godot 4.5 is already installed via gdvm, nothing to do."
+    echo "[UBUNTU SETUP] Godot is already installed, nothing to do."
   fi
 }
 
@@ -1186,6 +1211,7 @@ function installRust() {
     downloadAndVerify https://sh.rustup.rs install-rustup.sh cd9fd64eabc989f19a6a16e9cd2caabe935082e2715b9308150f86d3839c99eb9a7e42a7ef6730c6d956d870638ee89a04dd9e7e14fe243cc165967b7f2918da true
     chmod +x "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE"
     sh "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE" -y
+
     # shellcheck disable=SC1090
     source ~/.cargo/env
 
@@ -1226,12 +1252,33 @@ alias gcb='git branch -a | fzf | xargs git checkout'
   fi
 }
 
+function installGitHubCli() {
+  if ! command -v gh &>/dev/null; then
+    echo "[DT UBUNTU SETUP] Installing GitHub CLI..."
+    sudo apt install -y curl gpg ca-certificates
+
+    sudo curl -fsSLo /usr/share/keyrings/githubcli-archive-keyring.gpg https://cli.github.com/packages/githubcli-archive-keyring.gpg
+    echo "Types: deb
+URIs: https://cli.github.com/packages
+Suites: stable
+Components: main
+Architectures: $(dpkg --print-architecture)
+Signed-By: /usr/share/keyrings/githubcli-archive-keyring.gpg" | sudo tee /etc/apt/sources.list.d/github-cli.sources
+
+    sudo apt update
+    sudo apt install -y gh
+  else
+    echo "[DT UBUNTU SETUP] GitHub CLI is already installed. Nothing to do."
+  fi
+}
+
 function installDevTools() {
   echo "[UBUNTU SETUP] Installing essential dev-tools..."
   sudo apt install -y fish zsh build-essential gdb lldb shfmt
 
   installGit
-  installPdm
+  installGitHubCli
+  installPython
   installRust
   installNodeJs
   installVsCode
@@ -1413,6 +1460,9 @@ else
   echo "[UBUNTU SETUP] Running on $(lsb_release -sd 2>/dev/null)."
 fi
 
+# ensure essentials are installed before running other installers
+installEssentials
+
 if [[ "${UBUNTU_SETUP_RECONFIGURE_GIT:-}" == "1" ]] || [[ "${UBUNTU_SETUP_RECONFIGURE_LENAS_GIT:-}" == "1" ]]; then
   reconfigureGit
 fi
@@ -1461,9 +1511,7 @@ if [[ "${UBUNTU_SETUP_INSTALL_OPENSSH_SERVER:-}" == "1" ]]; then
     echo "Error: option --install-openssh-server is mutually exclusive with option --lenas-setup"
     exit 1
   else
-    echo OpenSSH server installer is not yet implemented!
-    #installOpenSshServer
-    exit 1
+    installOpenSshServer
   fi
 fi
 
