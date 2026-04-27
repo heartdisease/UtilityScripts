@@ -1,6 +1,7 @@
 #!/bin/bash
 IFS=$'\n\t'
 set -euo pipefail
+shopt -s globstar nullglob
 
 function downloadAndVerify() {
   local url=${1:-}
@@ -381,7 +382,12 @@ function reconfigureVsCode() {
 
 function installEssentials() {
   echo "[UBUNTU SETUP] Install essential command line utilities..."
-  sudo apt install -y apt-transport-https ca-certificates curl gpg
+  sudo apt install -y apt-transport-https ca-certificates apparmor-profiles bubblewrap curl gpg jq
+
+  if ! [ -f /etc/apparmor.d/bwrap-userns-restrict ]; then
+    sudo install -m 0644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/bwrap-userns-restrict
+    sudo systemctl reload apparmor
+  fi
 }
 
 function installCommandlineBasics() {
@@ -914,6 +920,13 @@ function installOpenWebUi() {
   echo "Open WebUI setup is not yet implemented!"
   # TODO: implement with Podman
   exit 1
+
+  # podman run -d --replace --name open-webui \
+  #   -e OPENAI_API_BASE_URL=http://host.containers.internal:8080/v1 \
+  #   -e ENABLE_OPENAI_API=true \
+  #   -v open-webui:/app/backend/data \
+  #   --network=pasta:--map-gw \
+  #   ghcr.io/open-webui/open-webui:v0.8.12
 }
 
 function installOpenSshServer() {
@@ -983,7 +996,7 @@ function installOllama() {
 
 function installLlamaCpp() {
   if ! command -v llama-cli &>/dev/null; then
-    local llamaCppProjectDir="$HOME/Downloads/github/ggml-org/llama.cpp"
+    local llamaCppProjectDir="$HOME/Downloads/git/ggml-org/llama.cpp"
 
     echo "[UBUNTU SETUP] Installing llama.cpp..."
     sudo apt install -y git build-essential llvm clang g++-14 ccache cmake libssl-dev libopenblas-dev libcurl4-openssl-dev zlib1g-dev nvidia-cuda-toolkit
@@ -1038,14 +1051,16 @@ function installLlamaCpp() {
 
     llama-cli --version
 
-    # llama-server --hf-repo 'bartowski/google_gemma-4-E4B-it-GGUF' --hf-file 'google_gemma-4-E4B-it-Q4_K_M.gguf' --port 8080 \
+    # llama-server --hf-repo 'unsloth/gemma-4-E4B-it-GGUF' --hf-file 'gemma-4-E4B-it-Q4_K_M.gguf' --port 8080 \
     #   -c 32768 \
     #   -ngl 99 \
     #   -fa on \
     #   --no-mmproj \
     #   --no-direct-io \
+    #   --cache-type-k q8_0 \
+    #   --cache-type-v q8_0 \
     #   --jinja \
-    #   --temp 0.6 \
+    #   --temp 0.4 \
     #   --top-p 0.95 \
     #   --top-k 20 \
     #   --presence-penalty 1.5 \
@@ -1094,11 +1109,12 @@ function installLlamaCpp() {
 
   echo Start llama-server on localhost:8080 with:
   echo llama-server --hf-repo 'Jackrong/Qwen3.5-9B-Claude-4.6-Opus-Reasoning-Distilled-v2-GGUF' --hf-file 'Qwen3.5-9B.Q4_K_M.gguf' --port 8080 \
-    -c 32768 \
+    -c 61440 \
     -ngl 99 \
     -fa on \
     --no-mmproj \
-    --no-direct-io \
+    --cache-type-k q8_0 \
+    --cache-type-v q8_0 \
     --jinja \
     --temp 0.4 \
     --top-p 0.95 \
@@ -1170,18 +1186,52 @@ function installNodeJs() {
   if ! command -v node &>/dev/null || [[ "$(node -v)" != "v24."* ]]; then
     echo "[UBUNTU SETUP] Installing and activating Node.js 24 via fnm..."
 
-    fnm install 24
+    fnm install 24 --corepack-enabled
     fnm use 24
-    npm i -g pnpm rimraf corepack
-    corepack enable
+    npm config set min-release-age 3
+    npm i -g pnpm rimraf
+    pnpm config set min-release-age 3
 
     fnm install 25
     fnm use 25
+    npm config set min-release-age 3
     npm i -g pnpm rimraf corepack
+    pnpm config set min-release-age 3
     corepack enable
 
     fnm default 24
     fnm use 24
+
+    # shellcheck disable=SC2016
+    echo '
+alias npm='"'"'bwrap \
+  --tmpfs /tmp \
+  --tmpfs "$HOME" \
+  --ro-bind /usr /usr \
+  --ro-bind /lib /lib \
+  --ro-bind /lib64 /lib64 \
+  --ro-bind /etc/resolv.conf /etc/resolv.conf \
+  --bind $(dirname $(dirname $(which npm))) $(dirname $(dirname $(which npm))) \
+  --bind "$HOME/.cache/node" "$HOME/.cache/node" \
+  --bind "$FNM_DIR" "$FNM_DIR" \
+  --bind "$PWD" "$PWD" \
+  npm --version'"'"'
+alias pnpm='"'"'bwrap \
+  --tmpfs /tmp \
+  --tmpfs "$HOME" \
+  --ro-bind /usr /usr \
+  --ro-bind /lib /lib \
+  --ro-bind /lib64 /lib64 \
+  --ro-bind /etc/resolv.conf /etc/resolv.conf \
+  --bind $(dirname $(dirname $(which pnpm))) $(dirname $(dirname $(which pnpm))) \
+  --bind "$HOME/.cache/node" "$HOME/.cache/node" \
+  --bind "$HOME/.cache/pnpm" "$HOME/.cache/pnpm" \
+  --bind "$HOME/.config/pnpm" "$HOME/.config/pnpm" \
+  --bind "$HOME/.local/share/pnpm" "$HOME/.local/share/pnpm" \
+  --bind "$FNM_DIR" "$FNM_DIR" \
+  --bind "$PWD" "$PWD" \
+  pnpm --version'"'"'
+' >>~/.bashrc
   else
     echo "[UBUNTU SETUP] Node.js 24 is already installed via fnm, nothing to do."
   fi
@@ -1190,8 +1240,9 @@ function installNodeJs() {
 function installGodot() {
   if ! command -v fgvm &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Friendly Godot Version Manager (fgvm)..."
-    echo "fgvm setup is not yet implemented!"
-    exit 1
+    downloadAndVerify https://github.com/patricktcoakley/fgvm/releases/download/v2.0.2/fgvm-linux-x64.zip fgvm-linux-x64.zip 40f9c023c6d4398f0444ba15895aea6080faaf278a4c42ffc588f548a0310d3073279748354cf5cf059ad9cb9880f2716ceab34833a972791b9ceb34dd9e35d0
+    unzip "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE" -d ~/.local/bin
+    chmod 755 ~/.local/bin/fgvm
   else
     echo "[UBUNTU SETUP] Friendly Godot Version Manager (fgvm) is already installed."
   fi
@@ -1199,7 +1250,8 @@ function installGodot() {
   if ! command -v godot &>/dev/null || [[ "$(godot --version 2>/dev/null)" != "4.5."* ]]; then
     echo "[UBUNTU SETUP] Installing and activating latest Godot version via fgvm..."
     fgvm install 4.5-stable
-    fgvm set 4.5-stable
+    fgvm set 4.5
+    ln "$(fgvm which --json | jq -r '.symlinkPath')" ~/.local/bin/godot
   else
     echo "[UBUNTU SETUP] Godot is already installed, nothing to do."
   fi
@@ -1484,8 +1536,8 @@ if [[ "${UBUNTU_SETUP_INSTALL_LOCAL_AI:-}" == "1" ]]; then
     exit 1
   else
     installNodeJs
-    installOpenCode
-    installClaudeCode
+    #installOpenCode
+    #installClaudeCode
     installLlamaCpp
     #installOllama
   fi
