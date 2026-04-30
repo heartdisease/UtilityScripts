@@ -100,15 +100,39 @@ function appendUniqueLineToBashrc() {
   appendUniqueTextToFile "$line" "$HOME/.bashrc"
 }
 
-function setGsettingIfSchemaExists() {
+function getGsetting() {
   local schema=${1:-}
   local key=${2:-}
   local value=${3:-}
 
   if gsettings list-schemas | grep -Fxq "$schema"; then
-    gsettings set "$schema" "$key" "$value"
+    if gsettings list-keys "$schema" | grep -Fxq "$key"; then
+      gsettings get "$schema" "$key"
+    else
+      echo "[UBUNTU SETUP] Missing key for gsettings schema $schema: $key"
+      exit 1
+    fi
   else
-    echo "[UBUNTU SETUP] Skip missing gsettings schema: $schema"
+    echo "[UBUNTU SETUP] Missing gsettings schema: $schema"
+    exit 1
+  fi
+}
+
+function applyGsetting() {
+  local schema=${1:-}
+  local key=${2:-}
+  local value=${3:-}
+
+  if gsettings list-schemas | grep -Fxq "$schema"; then
+    if gsettings list-keys "$schema" | grep -Fxq "$key"; then
+      gsettings set "$schema" "$key" "$value"
+    else
+      echo "[UBUNTU SETUP] Missing key for gsettings schema $schema: $key"
+      exit 1
+    fi
+  else
+    echo "[UBUNTU SETUP] Missing gsettings schema: $schema"
+    exit 1
   fi
 }
 
@@ -133,37 +157,44 @@ function configureGnomeSettings() {
     exit 1
   fi
 
+  local ignoredDirectories
+
+  echo "[UBUNTU SETUP] Adjust GNOME desktop settings..."
+  ignoredDirectories=$(getGsetting org.freedesktop.Tracker3.Miner.Files ignored-directories | sed "s/'/\"/g" | jq -c '. + ["/media/data/specialmedia"]' | sed "s/\"/'/g")
+  applyGsetting org.freedesktop.Tracker3.Miner.Files ignored-directories "$ignoredDirectories"
+  applyGsetting org.gnome.desktop.interface clock-format 24h
+
   echo "[UBUNTU SETUP] Adjust GNOME user settings for Nautilus..."
-  setGsettingIfSchemaExists org.gnome.nautilus.preferences default-sort-order 'type'
-  setGsettingIfSchemaExists org.gnome.nautilus.preferences show-create-link true
+  applyGsetting org.gnome.nautilus.preferences default-sort-order 'type'
+  applyGsetting org.gnome.nautilus.preferences show-create-link true
 
   echo "[UBUNTU SETUP] Adjust GNOME user settings for Gedit..."
-  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor display-line-numbers true
-  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor highlight-current-line true
-  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor bracket-matching true
-  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor scheme 'oblivion'
-  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor auto-indent true
-  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor insert-spaces true
-  setGsettingIfSchemaExists org.gnome.gedit.preferences.editor tabs-size 'uint32 2'
+  applyGsetting org.gnome.gedit.preferences.editor display-line-numbers true
+  applyGsetting org.gnome.gedit.preferences.editor highlight-current-line true
+  applyGsetting org.gnome.gedit.preferences.editor bracket-matching true
+  applyGsetting org.gnome.gedit.preferences.editor scheme 'oblivion'
+  applyGsetting org.gnome.gedit.preferences.editor auto-indent true
+  applyGsetting org.gnome.gedit.preferences.editor insert-spaces true
+  applyGsetting org.gnome.gedit.preferences.editor tabs-size 'uint32 2'
 
   echo "[UBUNTU SETUP] Adjust GNOME user settings to disable new annoying tiling feature..."
-  setGsettingIfSchemaExists org.gnome.mutter.keybindings toggle-tiled-left "['<Super>Left']"
-  setGsettingIfSchemaExists org.gnome.mutter.keybindings toggle-tiled-right "['<Super>Right']"
+  applyGsetting org.gnome.mutter.keybindings toggle-tiled-left "['<Super>Left']"
+  applyGsetting org.gnome.mutter.keybindings toggle-tiled-right "['<Super>Right']"
 
   #echo "[UBUNTU SETUP] Adjust GNOME user settings to disable default shortcuts that interfere with IntelliJ..."
   #setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings toggle-shaded "['disabled']"
 
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]] || [[ "${UBUNTU_SETUP_CONFIGURE_LENAS_GSETTINGS:-}" == "1" ]]; then
     echo "[UBUNTU SETUP] Adjust GNOME user settings to disable default shortcuts that interfere with Tomb Raider games..."
-    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings move-to-workspace-down "['<Control><Shift>Down']"
-    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings move-to-workspace-left "['<Control><Shift>Left']"
-    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings move-to-workspace-right "['<Control><Shift>Right']"
-    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings move-to-workspace-up "['<Control><Shift>Up']"
+    applyGsetting org.gnome.desktop.wm.keybindings move-to-workspace-down "['<Control><Shift>Down']"
+    applyGsetting org.gnome.desktop.wm.keybindings move-to-workspace-left "['<Control><Shift>Left']"
+    applyGsetting org.gnome.desktop.wm.keybindings move-to-workspace-right "['<Control><Shift>Right']"
+    applyGsetting org.gnome.desktop.wm.keybindings move-to-workspace-up "['<Control><Shift>Up']"
 
-    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings switch-to-workspace-down "['<Alt><Shift>Down']"
-    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings switch-to-workspace-left "['<Alt><Shift>Left']"
-    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings switch-to-workspace-right "['<Alt><Shift>Right']"
-    setGsettingIfSchemaExists org.gnome.desktop.wm.keybindings switch-to-workspace-up "['<Alt><Shift>Up']"
+    applyGsetting org.gnome.desktop.wm.keybindings switch-to-workspace-down "['<Alt><Shift>Down']"
+    applyGsetting org.gnome.desktop.wm.keybindings switch-to-workspace-left "['<Alt><Shift>Left']"
+    applyGsetting org.gnome.desktop.wm.keybindings switch-to-workspace-right "['<Alt><Shift>Right']"
+    applyGsetting org.gnome.desktop.wm.keybindings switch-to-workspace-up "['<Alt><Shift>Up']"
 
     #echo "[UBUNTU SETUP] Set mouse acceleration profile to 'flat' to avoid drag and drop issues..."
     #setGsettingIfSchemaExists set org.gnome.desktop.peripherals.mouse accel-profile 'flat'
@@ -1190,48 +1221,55 @@ function installNodeJs() {
     fnm use 24
     npm config set min-release-age 3
     npm i -g pnpm rimraf
-    pnpm config set min-release-age 3
+    pnpm config set minimum-release-age 4320 --global
 
     fnm install 25
     fnm use 25
     npm config set min-release-age 3
     npm i -g pnpm rimraf corepack
-    pnpm config set min-release-age 3
+    pnpm config set minimum-release-age 4320 --global
     corepack enable
 
     fnm default 24
-    fnm use 24
+    fnm use default
 
     # shellcheck disable=SC2016
-    echo '
-alias npm='"'"'bwrap \
+    local bwrapAliases='alias snpm='"'"'NPM_DIR=$(dirname $(which npm)) PROJECT_DIR=$(pwd) bwrap --unshare-all --share-net \
   --tmpfs /tmp \
   --tmpfs "$HOME" \
   --ro-bind /usr /usr \
   --ro-bind /lib /lib \
   --ro-bind /lib64 /lib64 \
   --ro-bind /etc/resolv.conf /etc/resolv.conf \
-  --bind $(dirname $(dirname $(which npm))) $(dirname $(dirname $(which npm))) \
+  --bind $(dirname $NPM_DIR) $(dirname $NPM_DIR) \
   --bind "$HOME/.cache/node" "$HOME/.cache/node" \
   --bind "$FNM_DIR" "$FNM_DIR" \
-  --bind "$PWD" "$PWD" \
-  npm --version'"'"'
-alias pnpm='"'"'bwrap \
+  --bind "$PROJECT_DIR" "$PROJECT_DIR" \
+  --setenv PATH "$PROJECT_DIR/node_modules/.bin:$NPM_DIR:$PATH" \
+  -- npm'"'"'
+alias spnpm='"'"'PNPM_DIR=$(dirname $(which pnpm)) PROJECT_DIR=$(pwd) bwrap --unshare-all --share-net \
   --tmpfs /tmp \
   --tmpfs "$HOME" \
   --ro-bind /usr /usr \
   --ro-bind /lib /lib \
   --ro-bind /lib64 /lib64 \
   --ro-bind /etc/resolv.conf /etc/resolv.conf \
-  --bind $(dirname $(dirname $(which pnpm))) $(dirname $(dirname $(which pnpm))) \
+  --bind $(dirname $PNPM_DIR) $(dirname $PNPM_DIR) \
   --bind "$HOME/.cache/node" "$HOME/.cache/node" \
   --bind "$HOME/.cache/pnpm" "$HOME/.cache/pnpm" \
   --bind "$HOME/.config/pnpm" "$HOME/.config/pnpm" \
   --bind "$HOME/.local/share/pnpm" "$HOME/.local/share/pnpm" \
+  --bind "$HOME/.local/state/pnpm" "$HOME/.local/state/pnpm" \
   --bind "$FNM_DIR" "$FNM_DIR" \
-  --bind "$PWD" "$PWD" \
-  pnpm --version'"'"'
-' >>~/.bashrc
+  --bind "$PROJECT_DIR" "$PROJECT_DIR" \
+  --setenv PATH "$PROJECT_DIR/node_modules/.bin:$NPM_DIR:$PATH" \
+  -- pnpm'"'"'
+
+'
+
+    printf "%s" "$bwrapAliases" >>~/.bashrc
+    # shellcheck disable=SC2016
+    printf "%s" "$bwrapAliases" | sed 's/$(/(/g' >~/.config/fish/conf.d/bwrap-npm-config.fish
   else
     echo "[UBUNTU SETUP] Node.js 24 is already installed via fnm, nothing to do."
   fi
