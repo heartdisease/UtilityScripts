@@ -90,7 +90,7 @@ function appendUniqueTextToFile() {
 
   touch "$filePath"
   if ! rg -qUF "$line" "$filePath"; then
-    printf '%s\n' "$line" >>"$filePath"
+    printf '\n%s\n' "$line" >>"$filePath"
   fi
 }
 
@@ -160,7 +160,10 @@ function configureGnomeSettings() {
   local ignoredDirectories
 
   echo "[UBUNTU SETUP] Adjust GNOME desktop settings..."
-  ignoredDirectories=$(getGsetting org.freedesktop.Tracker3.Miner.Files ignored-directories | sed "s/'/\"/g" | jq -c '. + ["/media/data/specialmedia"]' | sed "s/\"/'/g")
+  ignoredDirectories=$(getGsetting org.freedesktop.Tracker3.Miner.Files ignored-directories |
+    sed "s/'/\"/g" |
+    jq -c '. + ["/media/data/Development", "/media/data/private", "'"$HOME"'/.cache/thumbnails"]' |
+    sed "s/\"/'/g")
   applyGsetting org.freedesktop.Tracker3.Miner.Files ignored-directories "$ignoredDirectories"
   applyGsetting org.gnome.desktop.interface clock-format 24h
 
@@ -460,6 +463,7 @@ function installMultimediaUtils() {
 function installMsFonts() {
   if ! read -r -n1 -d "" < <(fc-list | grep -oi "Arial.ttf\|Verdana.ttf\|times.ttf"); then
     echo "[UBUNTU SETUP] Installing MS core fonts..."
+    # TODO does not work on Ubuntu 26.04!
     # automatically accepts the Microsoft End User License Agreement (EULA),
     # preventing the interactive prompt from the ttf-mscorefonts-installer
     echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
@@ -600,7 +604,10 @@ function installSpotify() {
 function installVsCode() {
   if ! command -v code &>/dev/null; then
     echo "[UBUNTU SETUP] Installing VSCode..."
-    curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+    # TODO move into separate helper function
+    if ! [ -f /usr/share/keyrings/microsoft.gpg ]; then
+      curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+    fi
     echo "Types: deb
 URIs: https://packages.microsoft.com/repos/code
 Suites: stable
@@ -787,7 +794,10 @@ function installBrave() {
 function installEdge() {
   if ! command -v microsoft-edge &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Microsoft Edge..."
-    curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+    # TODO move into separate helper function
+    if ! [ -f /usr/share/keyrings/microsoft.gpg ]; then
+      curl -sSL https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o /usr/share/keyrings/microsoft.gpg
+    fi
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/edge stable main" | sudo tee /etc/apt/sources.list.d/microsoft-edge.list
     sudo apt update
     sudo apt install -y microsoft-edge-stable
@@ -850,7 +860,8 @@ Signed-By: /usr/share/keyrings/steam.gpg" | sudo tee /etc/apt/sources.list.d/ste
 function installPython() {
   if ! command -v uv &>/dev/null; then
     echo "[UBUNTU SETUP] Installing uv..."
-    downloadAndExecute https://astral.sh/uv/install.sh install-uv.sh 4044482e2a46515babaa60d61d396bbe1dd16683337d7a1c7646acd48384d31b217eddc13089d52ebaf1a18d10aa81fd894ae43932b2c2a4577d2c2943748b2d
+    installRust
+    cargo install --locked uv
 
     echo "[UBUNTU SETUP] Installing Python 3.12 via uv..."
     uv python install --default 3.12
@@ -908,6 +919,10 @@ function installAndroidSdk() {
     downloadAndVerify "https://dl.google.com/android/repository/commandlinetools-linux-14742923_latest.zip" "commandlinetools-linux-14742923_latest.zip" "b65e830d7655fb39cc9eee669806977f462c49375807ef2c6487fabcc9afdbc210465ce6a1e2429ff95c74ca519d1239daf9a403c30b8d0bdb7a0962af656c8e"
     mkdir -p ~/.local/android/sdk/.temp
     unzip "${UBUNTU_SETUP_LAST_DOWNLOADED_FILE:-}" -d ~/.local/android/sdk/.temp
+
+    # TODO fix broken setup
+    # mv: cannot overwrite '/home/lena/.local/android/sdk/cmdline-tools/latest/bin': Directory not empty
+    # mv: cannot overwrite '/home/lena/.local/android/sdk/cmdline-tools/latest/lib': Directory not empty
     mkdir -p ~/.local/android/sdk/cmdline-tools/latest
     mv ~/.local/android/sdk/.temp/cmdline-tools/* ~/.local/android/sdk/cmdline-tools/latest
     rm -rf ~/.local/android/sdk/.temp
@@ -1191,24 +1206,20 @@ function installClaudeCode() {
 function installNodeJs() {
   if ! command -v fnm &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Fast Node Manager (fnm)..."
-    downloadAndExecute https://fnm.vercel.app/install install-fnm.sh 1cd47ee9579b492dffe2ed081e4e9178353a6f08b37fdc15c2b3fae983f1789ab27b96dc71907e36cbb7da774767c38cf6bd7c57baf88396cb8ddf2374b2aa58
+    installRust
+    cargo install --locked fnm
 
-    # install script already registered fnm in ~/.bashrc for us,
-    # but for whatever reason we cannot source it the current session
-    export PATH="$HOME/.local/share/fnm:$PATH"
-
-    if ! command -v fnm; then
-      echo "Failed to install Fast Node Manager (fnm). Abort."
-      exit 1
-    fi
+    # shellcheck disable=SC2016
+    appendUniqueTextToFile 'eval "$(fnm env --use-on-cd --shell bash)"' ~/.bashrc
 
     if command -v fish && [ -d ~/.config/fish/conf.d/ ]; then
       echo "Adding FNM env vars to Fish shell config..."
-      appendUniqueTextToFile "$(fnm env --use-on-cd --shell fish)" ~/.config/fish/conf.d/fnm.fish
+      cat >~/.config/fish/conf.d/fnm.fish <<<"fnm env --use-on-cd --shell fish | source"
     fi
     if command -v zsh &>/dev/null; then
       echo "Adding FNM env vars to ~/.zshrc..."
-      appendUniqueTextToFile "$(fnm env --use-on-cd --shell zsh)" ~/.zshrc
+      # shellcheck disable=SC2016
+      appendUniqueTextToFile 'eval "$(fnm env --use-on-cd --shell zsh)"' ~/.zshrc
     fi
   else
     echo "[UBUNTU SETUP] Fast Node Manager (fnm) is already installed."
@@ -1217,10 +1228,12 @@ function installNodeJs() {
   if ! command -v node &>/dev/null || [[ "$(node -v)" != "v24."* ]]; then
     echo "[UBUNTU SETUP] Installing and activating Node.js 24 via fnm..."
 
+    export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+
     fnm install 24 --corepack-enabled
     fnm use 24
     npm config set min-release-age 3
-    npm i -g pnpm rimraf
+    npm i -g rimraf
     pnpm config set minimum-release-age 4320 --global
 
     fnm install 25
@@ -1303,10 +1316,14 @@ function installRust() {
     sh "$UBUNTU_SETUP_LAST_DOWNLOADED_FILE" -y
 
     # shellcheck disable=SC1090
-    source ~/.cargo/env
+    . ~/.cargo/env
 
     rustup update
     rustup default stable
+
+    sudo apt install -y build-essential pkg-config libssl-dev
+    cargo install cargo-update
+    cargo install-update --all
   else
     echo "[UBUNTU SETUP] Rust is already installed. Nothing to do."
   fi
@@ -1319,22 +1336,22 @@ function installGit() {
     installRust
     cargo install ripgrep fd-find bat git-delta eza watchexec-cli difftastic
 
-    echo "
-#alias fd='fdfind'
-#alias bat='batcat'
-
-# use eza as ls-replacement with icons and details
-if command -v eza >/dev/null 2>&1; then
-  alias ls='eza --icons --group-directories-first'
-  alias ll='eza -lh --icons --group-directories-first'
-fi
+    # shellcheck disable=SC2016
+    local gitUtilsAliases='# use eza as ls-replacement with icons and details
+alias ls='"'"'eza --icons --group-directories-first'"'"'
+alias ll='"'"'eza -lh --icons --group-directories-first'"'"'
 
 # replace cat with bat (for syntax highlighting)
-alias cat='batcat -pp'
+alias cat='"'"'bat -pp'"'"'
 
 # switch branches interactively with fzf
-alias gcb='git branch -a | fzf | xargs git checkout'
-" >>~/.bashrc
+alias gcb='"'"'git branch -a | fzf | xargs git switch'"'"'
+
+'
+
+    printf "%s" "$gitUtilsAliases" >>~/.bashrc
+    # shellcheck disable=SC2016
+    printf "%s" "$gitUtilsAliases" | sed 's/$(/(/g' >~/.config/fish/conf.d/git-utils-aliases.fish
 
     reconfigureGit
   else
@@ -1380,14 +1397,14 @@ function installDevTools() {
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     installJava
     installGradle
-    installAndroidSdk
+    #installAndroidSdk
     installGodot
   fi
 }
 
 function installGnomeShell() {
   echo "[UBUNTU SETUP] Installing gnome-shell and related utilities..."
-  sudo apt install -y ubuntu-gnome-desktop gnome-shell-extension-manager gnome-browser-connector gnome-tweaks dconf-editor alacarte
+  sudo apt install -y ubuntu-gnome-desktop gnome-shell-extension-manager gnome-browser-connector gnome-tweaks dconf-editor alacarte gnome-terminal gedit
   configureGnomeSettings
 }
 
@@ -1453,9 +1470,16 @@ function startUbuntuSetup() {
   # set up UFW (Uncomplicated Firewall)
   configureFirewall
 
+  # auto-install recommended graphics drivers
+  sudo ubuntu-drivers install
+
+  # TODO ensure that all files have the correct architecture(s) set!
+  # auto-converts old *.list to new *.sources format in /etc/apt
+  #sudo apt modernize-sources
+
   sudo apt update
   sudo apt upgrade -y
-  sudo apt autoremove -y
+  sudo apt autoremove -y --fix-broken
 
   sudo snap refresh
   flatpak uninstall -y --unused
@@ -1543,8 +1567,11 @@ if [[ "$(lsb_release -si 2>/dev/null)" != "Ubuntu" ]]; then
   echo "[UBUNTU SETUP] Your linux distribution $(lsb_release -si 2>/dev/null) is not supported! Abort."
   exit 1
 fi
-if [[ "$(lsb_release -sr 2>/dev/null)" != "24.04" ]]; then
-  echo "[UBUNTU SETUP] Your Ubuntu version is not supported $(lsb_release -sr 2>/dev/null)! Abort."
+
+UBUNTU_SETUP_DISTRO_VERSION=$(lsb_release -sr 2>/dev/null)
+
+if [[ "$UBUNTU_SETUP_DISTRO_VERSION" != "24.04" ]] && [[ "$UBUNTU_SETUP_DISTRO_VERSION" != "26.04" ]]; then
+  echo "[UBUNTU SETUP] Your Ubuntu version is not supported $UBUNTU_SETUP_DISTRO_VERSION! Abort."
   exit 1
 else
   echo "[UBUNTU SETUP] Running on $(lsb_release -sd 2>/dev/null)."
