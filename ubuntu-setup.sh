@@ -961,32 +961,193 @@ function installPodman() {
   fi
 }
 
-function installOpenWebUi() {
-  echo "[UBUNTU SETUP] Installing Open WebUI..."
-  echo "Open WebUI setup is not yet implemented!"
-  # TODO: implement with Podman
-  exit 1
+function requirePodmanVersion5() {
+  local podmanMajorVersion
 
-  # podman run -d --replace --name open-webui \
-  #   -e OPENAI_API_BASE_URL=http://host.containers.internal:8080/v1 \
-  #   -e ENABLE_OPENAI_API=true \
-  #   -v open-webui:/app/backend/data \
-  #   --network=pasta:--map-gw \
-  #   ghcr.io/open-webui/open-webui:v0.8.12
+  installPodman
+
+  podmanMajorVersion=$(podman --version | grep -oE '[0-9]+' | head -n1)
+
+  if [[ "$podmanMajorVersion" != "5" ]]; then
+    echo "[UBUNTU SETUP] Unsupported Podman major version: ${podmanMajorVersion:-unknown}"
+    echo "[UBUNTU SETUP] Podman 5 is required. Abort."
+    exit 1
+  fi
+}
+
+function recreateManagedContainer() {
+  local containerName=${1:-}
+  local image=${2:-}
+  local serviceLabel=${3:-}
+  local existingImage
+
+  if podman container exists "$containerName"; then
+    existingImage=$(podman inspect --format '{{.ImageName}}' "$containerName" 2>/dev/null || true)
+
+    if [[ "$existingImage" != "$image" ]]; then
+      echo "[UBUNTU SETUP] A container named '$containerName' already exists, but it does not use image '$image'."
+      echo "[UBUNTU SETUP] Refusing to replace an unrelated container. Abort."
+      exit 1
+    fi
+
+    echo "[UBUNTU SETUP] Existing $serviceLabel container detected. Recreating it with the current configuration..."
+    podman rm -f "$containerName"
+  fi
+}
+
+function installOpenWebUi() {
+  local image="ghcr.io/open-webui/open-webui:main"
+  local containerName="open-webui"
+  local openWebUiRootDir="$HOME/.open-webui"
+  local openWebUiDataDir="$openWebUiRootDir/data"
+  local secretKeyFile="$openWebUiRootDir/webui-secret-key"
+  local webUiPort="3000"
+  local llamaCppBaseUrl="http://host.containers.internal:8080/v1"
+  local webUiSecretKey
+
+  echo "[UBUNTU SETUP] Installing Open WebUI..."
+
+  requirePodmanVersion5
+
+  if ! command -v openssl &>/dev/null; then
+    sudo apt install -y openssl
+  fi
+
+  mkdir -p "$openWebUiDataDir"
+
+  if ! [ -f "$secretKeyFile" ]; then
+    echo "[UBUNTU SETUP] Generating persistent Open WebUI secret key..."
+    umask 077
+    openssl rand -hex 32 >"$secretKeyFile"
+  fi
+
+  webUiSecretKey=$(<"$secretKeyFile")
+
+  if [[ -z "$webUiSecretKey" ]]; then
+    echo "Error: Open WebUI secret key file is empty ($secretKeyFile)"
+    echo "Abort."
+    exit 1
+  fi
+
+  recreateManagedContainer "$containerName" "$image" "Open WebUI"
+
+  echo "[UBUNTU SETUP] Pulling documented Open WebUI image '$image'..."
+  podman pull "$image"
+
+  echo "[UBUNTU SETUP] Starting Open WebUI container on http://127.0.0.1:$webUiPort ..."
+  podman run -d \
+    --name "$containerName" \
+    --hostname "$containerName" \
+    --pull newer \
+    --publish 127.0.0.1:$webUiPort:8080 \
+    --volume "$openWebUiDataDir:/app/backend/data:U" \
+    --env "TZ=$(cat /etc/timezone)" \
+    --env "WEBUI_URL=http://127.0.0.1:$webUiPort" \
+    --env "WEBUI_SECRET_KEY=$webUiSecretKey" \
+    --env "ENABLE_OPENAI_API=true" \
+    --env "OPENAI_API_BASE_URL=$llamaCppBaseUrl" \
+    --env "OPENAI_API_KEY=" \
+    "$image"
+
+  echo "[UBUNTU SETUP] Open WebUI container is running."
+  echo "[UBUNTU SETUP] Open http://127.0.0.1:$webUiPort to finish the first-run setup."
+  echo "[UBUNTU SETUP] OpenAI-compatible backend is preconfigured for llama.cpp at: $llamaCppBaseUrl"
+  echo "[UBUNTU SETUP] Persistent data directory: $openWebUiDataDir"
+  echo "[UBUNTU SETUP] Persistent secret key file: $secretKeyFile"
 }
 
 function installOpenSshServer() {
+  local image="lscr.io/linuxserver/openssh-server:latest"
+  local containerName="openssh-server"
+  local opensshRootDir="$HOME/.openssh-server"
+  local opensshConfigDir="$opensshRootDir/config"
+  local publicKeyFile="$HOME/.ssh/id_ed25519.pub"
+  local sshPort="2222"
+  local publicKey
+
   echo "[UBUNTU SETUP] Installing OpenSSH Server..."
-  echo "OpenSSH Server setup is not yet implemented!"
-  # TODO: implement with Podman
-  exit 1
+
+  if ! [ -f "$publicKeyFile" ]; then
+    echo "Error: expected public key file is missing ($publicKeyFile)"
+    echo "Abort."
+    exit 1
+  fi
+
+  requirePodmanVersion5
+
+  publicKey=$(<"$publicKeyFile")
+
+  mkdir -p "$opensshConfigDir"
+
+  recreateManagedContainer "$containerName" "$image" "OpenSSH Server"
+
+  echo "[UBUNTU SETUP] Pulling documented OpenSSH Server image '$image'..."
+  podman pull "$image"
+
+  echo "[UBUNTU SETUP] Starting OpenSSH Server container on ssh://127.0.0.1:$sshPort ..."
+  podman run -d \
+    --name "$containerName" \
+    --hostname "$containerName" \
+    --pull newer \
+    --publish 127.0.0.1:$sshPort:2222 \
+    --volume "$opensshConfigDir:/config:U" \
+    --env "PUID=$UBUNTU_SETUP_USER_ID" \
+    --env "PGID=$UBUNTU_SETUP_GROUP_ID" \
+    --env "TZ=$(cat /etc/timezone)" \
+    --env "PUBLIC_KEY=$publicKey" \
+    --env "PASSWORD_ACCESS=false" \
+    --env "SUDO_ACCESS=false" \
+    --env "USER_NAME=${UBUNTU_SETUP_USERNAME:-}" \
+    --env "LOG_STDOUT=true" \
+    "$image"
+
+  echo "[UBUNTU SETUP] OpenSSH Server container is running."
+  echo "[UBUNTU SETUP] Connect with: ssh -p $sshPort ${UBUNTU_SETUP_USERNAME:-}@127.0.0.1"
+  echo "[UBUNTU SETUP] Persistent config directory: $opensshConfigDir"
+  echo "[UBUNTU SETUP] Authorized keys were seeded from: $publicKeyFile"
 }
 
 function installGitea() {
+  local image="docker.gitea.com/gitea:1-rootless"
+  local containerName="gitea"
+  local giteaRootDir="$HOME/.gitea"
+  local giteaDataDir="$giteaRootDir/data"
+  local giteaConfigDir="$giteaRootDir/config"
+
   echo "[UBUNTU SETUP] Installing Gitea..."
-  echo "Gitea setup is not yet implemented!"
-  # TODO: implement with Podman
-  exit 1
+
+  requirePodmanVersion5
+
+  mkdir -p "$giteaDataDir" "$giteaConfigDir"
+
+  recreateManagedContainer "$containerName" "$image" "Gitea"
+
+  echo "[UBUNTU SETUP] Pulling official Gitea rootless image '$image'..."
+  podman pull "$image"
+
+  echo "[UBUNTU SETUP] Starting Gitea rootless container on http://127.0.0.1:3001 ..."
+  podman run -d \
+    --name "$containerName" \
+    --user "$UBUNTU_SETUP_USER_ID:$UBUNTU_SETUP_GROUP_ID" \
+    --pull newer \
+    --publish 127.0.0.1:3001:3000 \
+    --publish 127.0.0.1:2222:2222 \
+    --volume "$giteaDataDir:/var/lib/gitea:U" \
+    --volume "$giteaConfigDir:/etc/gitea:U" \
+    --volume /etc/timezone:/etc/timezone:ro \
+    --volume /etc/localtime:/etc/localtime:ro \
+    --env GITEA__database__DB_TYPE=sqlite3 \
+    --env GITEA__server__ROOT_URL=http://127.0.0.1:3001/ \
+    --env GITEA__server__SSH_DOMAIN=127.0.0.1 \
+    --env GITEA__server__SSH_PORT=2222 \
+    --env GITEA__server__START_SSH_SERVER=true \
+    "$image"
+
+  echo "[UBUNTU SETUP] Gitea container is running."
+  echo "[UBUNTU SETUP] Open http://127.0.0.1:3001 to finish the first-run setup."
+  echo "[UBUNTU SETUP] Persistent data directory: $giteaDataDir"
+  echo "[UBUNTU SETUP] Persistent config directory: $giteaConfigDir"
+  echo "[UBUNTU SETUP] SSH clone URL base will use port 2222 on localhost."
 }
 
 function installVeracrypt() {
@@ -1550,6 +1711,8 @@ for arg in "$@"; do
 done
 
 UBUNTU_SETUP_USERNAME=$(id -un)
+UBUNTU_SETUP_USER_ID=$(id -u)
+UBUNTU_SETUP_GROUP_ID=$(id -g)
 
 if [[ -n "$BASH_VERSION" ]]; then
   echo "[UBUNTU SETUP] Script is running in Bash ($BASH_VERSION)."
