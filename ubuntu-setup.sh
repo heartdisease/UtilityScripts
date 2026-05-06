@@ -659,6 +659,23 @@ function installVlc() {
   fi
 }
 
+function installCine() {
+  if ! command -v cine &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Cine..."
+    installFlatpak true
+
+    if ! flatpak info io.github.diegopvlk.Cine &>/dev/null; then
+      flatpak install -y --user flathub io.github.diegopvlk.Cine
+      flatpak run --user io.github.diegopvlk.Cine &
+      disown
+    else
+      echo "[UBUNTU SETUP] Cine is already installed via Flatpak. Nothing to do."
+    fi
+  else
+    echo "[UBUNTU SETUP] Cine is already installed. Nothing to do."
+  fi
+}
+
 function installElement() {
   if ! command -v element-desktop &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Element..."
@@ -1595,6 +1612,7 @@ function startUbuntuSetup() {
 
   # install flatpak packages
   installVlc
+  installCine
   installGimp
   installInkscape
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
