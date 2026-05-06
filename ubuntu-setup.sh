@@ -1582,7 +1582,7 @@ function installDevTools() {
 
 function installGnomeShell() {
   echo "[UBUNTU SETUP] Installing gnome-shell and related utilities..."
-  sudo apt install -y ubuntu-gnome-desktop gnome-shell-extension-manager gnome-browser-connector gnome-tweaks dconf-editor alacarte gnome-terminal gedit
+  sudo apt install -y ubuntu-gnome-desktop gnome-shell-extension-manager gnome-browser-connector gnome-tweaks dconf-editor alacarte gnome-terminal gedit gthumb
   configureGnomeSettings
 }
 
