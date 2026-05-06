@@ -15,7 +15,7 @@ function deleteRecentThumbnails() {
     if (($(stat -c %Y "$file") > limit)); then
       echo "Delete file '$file' [last modified: $(date -d @"$(stat -c %Y "$file")" "+%Y-%m-%d %H:%M:%S")]..."
       #shred -fuzn 0 "$file"
-      echo rm -vf "$file"
+      rm -vf "$file"
     fi
   done
 }
