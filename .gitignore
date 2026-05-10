@@ -10,12 +10,13 @@
 *.jpeg
 *.gif
 *.svg
+*.csv
 
 fstab*
 wlan-pw.txt
 wordanalyzer/output.csv
 wordanalyzer/__pycache__
 
+*-db/
 restored/
-
 node_modules/

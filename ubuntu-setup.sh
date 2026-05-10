@@ -429,7 +429,8 @@ function installCommandlineBasics() {
   sudo apt install -y libsecret-tools mesa-utils \
     net-tools plocate rhash pwgen \
     unzip zstd tar bzip2 xz-utils brotli rar unrar p7zip-full \
-    imagemagick optipng pdftk-java texlive-latex-recommended texlive-extra-utils \
+    ffmpeg imagemagick optipng pdftk-java libimage-exiftool-perl \
+    texlive-latex-recommended texlive-extra-utils \
     fish yt-dlp
 }
 
@@ -1569,7 +1570,7 @@ function installDevTools() {
   installVsCode
 
   # install cli tools frequently used by AI agents
-  sudo apt install -y jq fzf
+  sudo apt install -y jq fzf miller csvkit
   cargo install ripgrep fd-find bat eza sd tokei hyperfine du-dust duf procs xh watchexec-cli git-delta difftastic ast-grep
 
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
