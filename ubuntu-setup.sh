@@ -638,8 +638,25 @@ function installFlatpak() {
 
     flatpak update -y --noninteractive
     flatpak update -y --noninteractive --appstream
+
+    installFlatseal
   elif [[ "$disableSkipMessage" != "true" ]]; then
     echo "[UBUNTU SETUP] Flatpak is already installed. Nothing to do."
+  fi
+}
+
+function installFlatseal() {
+  if ! command -v flatpak &>/dev/null; then
+    installFlatpak true
+  fi
+
+  if ! flatpak info com.github.tchx84.Flatseal &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Flatseal..."
+    flatpak install -y --user flathub com.github.tchx84.Flatseal
+    flatpak run --user flathub com.github.tchx84.Flatseal &
+    disown
+  else
+    echo "[UBUNTU SETUP] Flatseal is already installed via Flatpak. Nothing to do."
   fi
 }
 
@@ -690,6 +707,9 @@ function installElement() {
       # The Flatpak version requires specific permissions for file access. By default, it may not access your files.
       # To allow access to common directories like Pictures, Videos, and Documents, use:
       # flatpak override --filesystem=xdg-pictures --filesystem=xdg-videos --filesystem=xdg-documents im.riot.Riot
+
+      # In case you get "Electron has detected that encryption is not available on your keyring gnome_libsecret"
+      # when opening the application, launch Flatseal and ensure dbus-session is enabled!
     else
       echo "[UBUNTU SETUP] Element is already installed via Flatpak. Nothing to do."
     fi
@@ -1560,7 +1580,7 @@ Signed-By: /usr/share/keyrings/githubcli-archive-keyring.gpg" | sudo tee /etc/ap
 
 function installDevTools() {
   echo "[UBUNTU SETUP] Installing essential dev-tools..."
-  sudo apt install -y fish zsh build-essential gdb lldb shfmt
+  sudo apt install -y fish zsh shfmt build-essential llvm clang ccache cmake gdb lldb
 
   installGit
   installGitHubCli
@@ -1570,8 +1590,8 @@ function installDevTools() {
   installVsCode
 
   # install cli tools frequently used by AI agents
-  sudo apt install -y jq fzf miller csvkit
-  cargo install ripgrep fd-find bat eza sd tokei hyperfine du-dust duf procs xh watchexec-cli git-delta difftastic ast-grep
+  sudo apt install -y jq fzf miller csvkit ripgrep ripgrep-all
+  cargo install fd-find bat eza sd tokei hyperfine du-dust duf procs xh watchexec-cli git-delta difftastic ast-grep
 
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     installJava
