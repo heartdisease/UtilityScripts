@@ -157,14 +157,9 @@ function configureGnomeSettings() {
     exit 1
   fi
 
-  local ignoredDirectories
-
   echo "[UBUNTU SETUP] Adjust GNOME desktop settings..."
-  ignoredDirectories=$(getGsetting org.freedesktop.Tracker3.Miner.Files ignored-directories |
-    sed "s/'/\"/g" |
-    jq -c '. + ["/media/data/Development", "/media/data/private", "'"$HOME"'/.cache/thumbnails"]' |
-    sed "s/\"/'/g")
-  applyGsetting org.freedesktop.Tracker3.Miner.Files ignored-directories "$ignoredDirectories"
+  applyGsetting org.gnome.desktop.privacy search-history false
+  applyGsetting org.gnome.desktop.privacy remember-app-usage false
   applyGsetting org.gnome.desktop.interface clock-format 24h
 
   echo "[UBUNTU SETUP] Adjust GNOME user settings for Nautilus..."
@@ -645,33 +640,29 @@ function installFlatpak() {
   fi
 }
 
-function installFlatseal() {
-  if ! command -v flatpak &>/dev/null; then
-    installFlatpak true
-  fi
+function installFlathubPackage() {
+  flatpakPackage=${1:-}
+  appName=${2:-}
 
-  if ! flatpak info com.github.tchx84.Flatseal &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Flatseal..."
-    flatpak install -y --user flathub com.github.tchx84.Flatseal
-    flatpak run --user flathub com.github.tchx84.Flatseal &
+  installFlatpak true
+
+  if ! flatpak info "$flatpakPackage" &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing $appName..."
+    flatpak install -y --user flathub "$flatpakPackage"
+    flatpak run --user "$flatpakPackage" &
     disown
   else
-    echo "[UBUNTU SETUP] Flatseal is already installed via Flatpak. Nothing to do."
+    echo "[UBUNTU SETUP] $appName is already installed via Flatpak. Nothing to do."
   fi
+}
+
+function installFlatseal() {
+  installFlathubPackage com.github.tchx84.Flatseal Flatseal
 }
 
 function installVlc() {
   if ! command -v vlc &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing VLC Player..."
-    installFlatpak true
-
-    if ! flatpak info org.videolan.VLC &>/dev/null; then
-      flatpak install -y --user flathub org.videolan.VLC
-      flatpak run --user org.videolan.VLC &
-      disown
-    else
-      echo "[UBUNTU SETUP] VLC Player is already installed via Flatpak. Nothing to do."
-    fi
+    installFlathubPackage org.videolan.VLC "VLC Player"
   else
     echo "[UBUNTU SETUP] VLC Player is already installed. Nothing to do."
   fi
@@ -679,16 +670,7 @@ function installVlc() {
 
 function installCine() {
   if ! command -v cine &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Cine..."
-    installFlatpak true
-
-    if ! flatpak info io.github.diegopvlk.Cine &>/dev/null; then
-      flatpak install -y --user flathub io.github.diegopvlk.Cine
-      flatpak run --user io.github.diegopvlk.Cine &
-      disown
-    else
-      echo "[UBUNTU SETUP] Cine is already installed via Flatpak. Nothing to do."
-    fi
+    installFlathubPackage io.github.diegopvlk.Cine Cine
   else
     echo "[UBUNTU SETUP] Cine is already installed. Nothing to do."
   fi
@@ -696,23 +678,13 @@ function installCine() {
 
 function installElement() {
   if ! command -v element-desktop &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Element..."
-    installFlatpak true
+    # The Flatpak version requires specific permissions for file access. By default, it may not access your files.
+    # To allow access to common directories like Pictures, Videos, and Documents, use:
+    # flatpak override --filesystem=xdg-pictures --filesystem=xdg-videos --filesystem=xdg-documents im.riot.Riot
 
-    if ! flatpak info im.riot.Riot &>/dev/null; then
-      flatpak install -y --user flathub im.riot.Riot
-      flatpak run --user flathub im.riot.Riot &
-      disown
-
-      # The Flatpak version requires specific permissions for file access. By default, it may not access your files.
-      # To allow access to common directories like Pictures, Videos, and Documents, use:
-      # flatpak override --filesystem=xdg-pictures --filesystem=xdg-videos --filesystem=xdg-documents im.riot.Riot
-
-      # In case you get "Electron has detected that encryption is not available on your keyring gnome_libsecret"
-      # when opening the application, launch Flatseal and ensure dbus-session is enabled!
-    else
-      echo "[UBUNTU SETUP] Element is already installed via Flatpak. Nothing to do."
-    fi
+    # In case you get "Electron has detected that encryption is not available on your keyring gnome_libsecret"
+    # when opening the application, launch Flatseal and ensure dbus-session is enabled!
+    installFlathubPackage im.riot.Riot Element
   else
     echo "[UBUNTU SETUP] Element is already installed. Nothing to do."
   fi
@@ -720,16 +692,7 @@ function installElement() {
 
 function installInkscape() {
   if ! command -v inkscape &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Inkscape..."
-    installFlatpak true
-
-    if ! flatpak info org.inkscape.Inkscape &>/dev/null; then
-      flatpak install -y --user flathub org.inkscape.Inkscape
-      flatpak run --user org.inkscape.Inkscape &
-      disown
-    else
-      echo "[UBUNTU SETUP] Inkscape is already installed via Flatpak. Nothing to do."
-    fi
+    installFlathubPackage org.inkscape.Inkscape Inkscape
   else
     echo "[UBUNTU SETUP] Inkscape is already installed. Nothing to do."
   fi
@@ -754,58 +717,26 @@ function installGimp() {
 
 function installBlender() {
   if ! command -v blender &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Blender..."
-    installFlatpak true
-
-    if ! flatpak info org.blender.Blender &>/dev/null; then
-      flatpak install -y --user flathub org.blender.Blender
-      flatpak run --user org.blender.Blender &
-      disown
-    else
-      echo "[UBUNTU SETUP] Blender is already installed via Flatpak. Nothing to do."
-    fi
+    installFlathubPackage org.blender.Blender Blender
   else
     echo "[UBUNTU SETUP] Blender is already installed. Nothing to do."
   fi
 }
 
-function installProtonUp() {
-  installFlatpak true
+function installHeroic() {
+  installFlathubPackage com.heroicgameslauncher.hgl "Heroic Games Launcher"
+}
 
-  if ! flatpak info net.davidotek.pupgui2 &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing ProtonUp-Qt..."
-    flatpak install -y --user flathub net.davidotek.pupgui2
-    flatpak run --user net.davidotek.pupgui2 &
-    disown
-  else
-    echo "[UBUNTU SETUP] ProtonUp-Qt is already installed. Nothing to do."
-  fi
+function installProtonUp() {
+  installFlathubPackage net.davidotek.pupgui2 "ProtonUp-Qt"
 }
 
 function installMupen64Plus() {
-  installFlatpak true
-
-  if ! flatpak info net.sourceforge.m64py.M64Py &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Mupen64Plus + M64Py..."
-    flatpak install -y --user flathub net.sourceforge.m64py.M64Py
-    flatpak run --user net.sourceforge.m64py.M64Py &
-    disown
-  else
-    echo "[UBUNTU SETUP] Mupen64Plus + M64Py are already installed. Nothing to do."
-  fi
+  installFlathubPackage net.sourceforge.m64py.M64Py "Mupen64Plus + M64Py"
 }
 
 function installAzahar() {
-  installFlatpak true
-
-  if ! flatpak info org.azahar_emu.Azahar &>/dev/null; then
-    echo "[UBUNTU SETUP] Installing Azahar..."
-    flatpak install -y --user flathub org.azahar_emu.Azahar
-    flatpak run --user org.azahar_emu.Azahar &
-    disown
-  else
-    echo "[UBUNTU SETUP] Azahar is already installed. Nothing to do."
-  fi
+  installFlathubPackage org.azahar_emu.Azahar Azahar
 }
 
 function installTorBrowser() {
@@ -1590,7 +1521,7 @@ function installDevTools() {
   installVsCode
 
   # install cli tools frequently used by AI agents
-  sudo apt install -y jq fzf miller csvkit ripgrep ripgrep-all
+  sudo apt install -y jq yq xq fzf miller csvkit ripgrep ripgrep-all
   cargo install fd-find bat eza sd tokei hyperfine du-dust duf procs xh watchexec-cli git-delta difftastic ast-grep
 
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
@@ -1654,6 +1585,7 @@ function startUbuntuSetup() {
   # install gaming setup
   installSteam
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
+    installHeroic
     installAzahar
     installMupen64Plus
   fi
