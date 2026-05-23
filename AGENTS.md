@@ -1,64 +1,38 @@
 # AGENTS.md
 
-## Scope
+Two unrelated workflows live in this repo. Apply only the matching section:
+1. Socialism DB: `./marxist-db/`
+2. Medical DB: `./med-db/`
 
-- Use for glossary-style CSV work in this repo.
-- Main cases: main glossary, `tmp.csv`, `tmp2.csv`, similar scratch files.
+Do not mix the two domains unless the user explicitly asks for both.
 
-## Sources
+## Shared
 
-- Search the main glossary first.
-- Treat `./marxist-db` as the local archive folder in repo root for loaded source pages and lookup material.
-- Keep `marxist-db` updated with every newly loaded or actually used source page.
-- Create `marxist-db` if it does not exist before doing source collection; do not assume it already exists on checkout.
-- Look up leftist terminology on `marxists.org` first.
-- If not found there, use `theanarchistlibrary.org` next.
-- If still not found there, use `libcom.org` next.
-- Use Wikipedia or other outside sources only after checking those three first.
-- Reuse validated glossary wording when possible.
-- Keep derived scratch CSVs aligned with main glossary wording unless user asks for rewrite.
-- If several phrasings work, pick the one closest to glossary tone.
+- Make the smallest local change that works; if patch context is stale, re-read the exact snippet and retry; treat scratch files as ephemeral unless asked to preserve them.
+- For CSV work, start by checking `command -v mlr`, `csvcut`, `csvlook`, `csvstat`, `csvjson`; prefer `mlr`; do not assume a `csvkit` binary exists.
+- Re-read the current CSV before every edit, trust file state not memory, validate right after each edit, and prefer CSV-aware checks.
+- Ignore validation noise from intentionally empty optional fields.
 
-## CSV Tooling
+## Socialism DB (`./marxist-db/`)
 
-- Start each new CSV session by testing local CSV tools.
-- Check real commands, not package names: `command -v mlr`, `command -v csvcut`, `command -v csvlook`, `command -v csvstat`, `command -v csvjson`.
-- Prefer `mlr` for inspect, filter, reshape, and validate.
-- Prefer `csvcut`, `csvlook`, `csvstat`, and `csvjson` when they fit.
-- Do not assume a `csvkit` binary exists.
-- If CSV tools are missing, use narrow delimiter-aware fallback checks.
+- Use for glossary-style CSV work: main glossary, `tmp.csv`, `tmp2.csv`, and similar scratch files.
+- Search the main glossary first. Treat `./marxist-db` as the local archive; create it if missing and keep it updated with every newly loaded or used source page.
+- Source order: `marxists.org`, then `theanarchistlibrary.org`, then `libcom.org`, then outside sources.
+- Reuse validated glossary wording; keep derived scratch CSVs aligned with the glossary unless the user asks for a rewrite; if several phrasings work, choose the one closest to glossary tone.
+- CSV format: header exactly `Deutscher Begriff,Englischer Begriff,Bedeutung,Kategorie,Beispiel`; exactly 5 fields; remove `,,,,`; keep everything in German except column 2; convert blank or English column 1 into the proper German term.
+- Writing: short glossary definitions, match surrounding wording, leave `Beispiel` empty unless needed, use semicolons in `Bedeutung` unless properly quoted, make criticism explicit in Marxist/revolutionary Marxist/Trotskyist rewrites, and avoid overclaiming.
+- Validation: confirm 5 fields per row, replace unintended commas in `Bedeutung` with semicolons, and treat an empty `Beispiel` as fine unless examples are requested.
 
-## CSV Workflow
+## Medical DB (`./med-db/`)
 
-- Re-read the current CSV before every edit.
-- Trust file state, not memory.
-- Keep the header exactly: `Deutscher Begriff,Englischer Begriff,Bedeutung,Kategorie,Beispiel`.
-- Keep exactly 5 fields per row.
-- Remove placeholder rows like `,,,,`.
-- Convert a blank or English first column into the proper German term; keep the English term in column 2.
-- Keep everything in German except column 2 for this glossary pattern.
-
-## Writing
-
-- Write short definitions in glossary style.
-- Match surrounding wording.
-- Leave `Beispiel` empty unless needed.
-- Use semicolons in `Bedeutung` unless the field is properly quoted.
-- Make criticism explicit in Marxist, revolutionary Marxist, or Trotskyist rewrites.
-- Stay precise and do not overclaim when the source base is thin.
-
-## Validation
-
-- Prefer CSV-aware CLI checks first.
-- Confirm 5 fields per row after each edit.
-- Watch for commas in `Bedeutung`; replace them with semicolons unless intentionally quoted.
-- Validate right after each edit.
-- Treat an empty `Beispiel` as fine unless user asks for examples.
-- Ignore checks that only flag empty example cells.
-
-## Editing
-
-- Make the smallest local change that works.
-- If the user names rows, edit only those rows.
-- If patch context is stale, re-read the exact snippet and retry.
-- Treat scratch CSVs as ephemeral.
+- Use for medical, nutritional, or endometriosis literature collection and evidence summaries.
+- Prefer formal evidence over general summaries. Evidence order: guidelines > systematic reviews/meta-analyses > randomized trials > observational studies. Use narrative reviews only to fill gaps or locate primary studies. Do not treat risk-association studies as treatment evidence.
+- Search in PubMed via NCBI E-utilities, not PubMed HTML. Default flow: `esearch` -> `esummary` -> `efetch` with `rettype=abstract&retmode=text`.
+- Before concluding, rerun the exact machine-readable search and record query, access date, PMID, DOI, journal, and study type. Inspect titles because PubMed searches can return irrelevant hits.
+- Pitfalls: PubMed HTML may show anti-bot pages; OUP and other publishers may return `403`; guideline landing pages may expose metadata without recommendation text; if full text is blocked, summarize only what is supported by abstract, metadata, PMC, or accessible supplements.
+- Writing: use cautious wording for heterogeneous, low-quality, or indirect evidence; do not turn absence of evidence into harm, or mechanistic/animal results into clinical recommendations; explicitly name limits such as pilots, open-label studies, exploratory biomarker work, or poor-quality meta-analyses.
+- Treat `./med-db` as the local archive; create it if missing and keep every used search result, abstract, metadata record, and source page updated.
+- Default archive command: `python3 ./pubmed-med-db.py --query '...' --archive-first N --validate`; use repeated `--pmid` flags for explicit PMIDs.
+- `pubmed-med-db.py` auto-creates `searches/`, `metadata/`, `abstracts/`, assigns the next `sNN-...json`, and syncs `med-db/README.md`.
+- Store searches as machine-readable JSON, abstracts as plain text, use stable `pmid-<id>-<slug>` filenames, and keep `med-db/README.md` indexed.
+- Run `python3 ./med-db-validate.py` after structural changes and before relying on the local archive; it checks required directories, empty files, JSON validity, metadata/abstract pairing, contiguous search numbering, and README consistency.

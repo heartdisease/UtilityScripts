@@ -1,5 +1,5 @@
-.*
 *~
+.env*
 
 !.vscode
 !.editorconfig
@@ -17,6 +17,7 @@ wlan-pw.txt
 wordanalyzer/output.csv
 wordanalyzer/__pycache__
 
+tmp/
 *-db/
 restored/
 node_modules/
