@@ -1452,6 +1452,7 @@ function installRust() {
     rustup default stable
 
     sudo apt install -y build-essential pkg-config libssl-dev
+
     cargo install cargo-update
     cargo install-update --all
   else
@@ -1462,9 +1463,12 @@ function installRust() {
 function installGit() {
   if ! command -v git &>/dev/null; then
     echo "[UBUNTU SETUP] Installing Git..."
-    sudo apt install -y git fzf
+    sudo apt install -y git git-lfs fzf
+    git lfs install
+
     installRust
-    cargo install ripgrep fd-find bat git-delta eza watchexec-cli difftastic
+    sudo apt install -y ripgrep fd-find bat git-delta eza
+    cargo install watchexec-cli difftastic
 
     # shellcheck disable=SC2016
     local gitUtilsAliases='# use eza as ls-replacement with icons and details
@@ -1521,8 +1525,10 @@ function installDevTools() {
   installVsCode
 
   # install cli tools frequently used by AI agents
-  sudo apt install -y jq yq xq fzf miller csvkit ripgrep ripgrep-all
-  cargo install fd-find bat eza sd tokei hyperfine du-dust duf procs xh watchexec-cli git-delta difftastic ast-grep
+  sudo apt install -y jq yq xq miller csvkit \
+    ripgrep fzf fd-find bat eza sd tokei hyperfine du-dust duf procs xh git-delta \
+    ripgrep-all poppler-utils tesseract-ocr
+  cargo install watchexec-cli difftastic ast-grep
 
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     installJava
@@ -1614,8 +1620,11 @@ function startUbuntuSetup() {
   sudo apt autoremove -y --fix-broken
 
   sudo snap refresh
+
   flatpak uninstall -y --unused
   flatpak update -y --noninteractive
+
+  cargo install-update --all
 
   echo "[UBUNTU SETUP] Setup complete!"
   exit 0
