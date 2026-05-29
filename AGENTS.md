@@ -1,38 +1,30 @@
 # AGENTS.md
 
-Two unrelated workflows live in this repo. Apply only the matching section:
-1. Socialism DB: `./marxist-db/`
-2. Medical DB: `./med-db/`
-
-Do not mix the two domains unless the user explicitly asks for both.
+This repo is centered on personal workstation bootstrap and maintenance scripts, especially `./ubuntu-setup.sh`, plus a grab bag of standalone CLI utilities.
 
 ## Shared
 
-- Make the smallest local change that works; if patch context is stale, re-read the exact snippet and retry; treat scratch files as ephemeral unless asked to preserve them.
-- For CSV work, start by checking `command -v mlr`, `csvcut`, `csvlook`, `csvstat`, `csvjson`; prefer `mlr`; do not assume a `csvkit` binary exists.
-- Re-read the current CSV before every edit, trust file state not memory, validate right after each edit, and prefer CSV-aware checks.
-- Ignore validation noise from intentionally empty optional fields.
+- Make the smallest local change that works; if patch context is stale, re-read the exact snippet and retry.
+- Re-read the current script before every edit, trust file state not memory, and validate immediately after each change.
+- Preserve existing CLI shape unless the user asks to redesign it: flags, environment variables, prompts, exit behavior, and default side effects are part of the interface.
+- Prefer focused validation such as `bash -n`, `shellcheck` if available, or a narrow `--help`/dry-run style check over broad execution of install scripts.
+- Do not run destructive scripts or commands without explicit user intent. Treat scripts such as `clean-home.sh` as high-risk and preserve their confirmation barriers.
+- For shell scripts, keep the current style and existing helper abstractions instead of inlining one-off logic.
+- For German prose or user-facing text, use standard German orthography with umlauts and `ß` unless the user explicitly asks for ASCII.
 
-## Socialism DB (`./marxist-db/`)
+## Setup Scripts
 
-- Use for glossary-style CSV work: main glossary, `tmp.csv`, `tmp2.csv`, and similar scratch files.
-- Search the main glossary first. Treat `./marxist-db` as the local archive; create it if missing and keep it updated with every newly loaded or used source page.
-- Source order: `marxists.org`, then `theanarchistlibrary.org`, then `libcom.org`, then outside sources.
-- Reuse validated glossary wording; keep derived scratch CSVs aligned with the glossary unless the user asks for a rewrite; if several phrasings work, choose the one closest to glossary tone.
-- CSV format: header exactly `Deutscher Begriff,Englischer Begriff,Bedeutung,Kategorie,Beispiel`; exactly 5 fields; remove `,,,,`; keep everything in German except column 2; convert blank or English column 1 into the proper German term.
-- Writing: short glossary definitions, match surrounding wording, leave `Beispiel` empty unless needed, use semicolons in `Bedeutung` unless properly quoted, make criticism explicit in Marxist/revolutionary Marxist/Trotskyist rewrites, and avoid overclaiming.
-- Validation: confirm 5 fields per row, replace unintended commas in `Bedeutung` with semicolons, and treat an empty `Beispiel` as fine unless examples are requested.
+- `./ubuntu-setup.sh` is the main integration surface in this repo. Prefer editing existing helper functions and feature-specific installers over adding ad hoc logic in `main`.
+- Keep setup actions idempotent where the script already aims for that: command-existence checks, guarded config edits, backup-before-reconfigure behavior, and safe re-runs should not regress.
+- Preserve the current split between general setup and Lena-specific opt-ins such as `--lenas-setup` and related `UBUNTU_SETUP_*` flags unless the user explicitly asks to redesign that boundary.
+- When touching download-and-run flows, keep checksum verification before execution. Do not weaken integrity checks or silently replace them with trust-on-first-use behavior.
+- When touching Podman-managed services, follow the existing safety pattern: require Podman 5, refuse to replace unrelated same-name containers, keep persistent state under the calling user's home directory, and prefer loopback-only port bindings unless the user explicitly asks to expose services.
+- When changing GNOME, Git, VS Code, or shell reconfiguration steps, preserve explicit backup or append-only behavior unless the user asked for a reset.
+- If a change affects CLI flags or execution flow in `ubuntu-setup.sh`, validate at minimum with `bash -n ./ubuntu-setup.sh` and `./ubuntu-setup.sh --help`.
 
-## Medical DB (`./med-db/`)
+## Standalone Utilities
 
-- Use for medical, nutritional, or endometriosis literature collection and evidence summaries.
-- Prefer formal evidence over general summaries. Evidence order: guidelines > systematic reviews/meta-analyses > randomized trials > observational studies. Use narrative reviews only to fill gaps or locate primary studies. Do not treat risk-association studies as treatment evidence.
-- Search in PubMed via NCBI E-utilities, not PubMed HTML. Default flow: `esearch` -> `esummary` -> `efetch` with `rettype=abstract&retmode=text`.
-- Before concluding, rerun the exact machine-readable search and record query, access date, PMID, DOI, journal, and study type. Inspect titles because PubMed searches can return irrelevant hits.
-- Pitfalls: PubMed HTML may show anti-bot pages; OUP and other publishers may return `403`; guideline landing pages may expose metadata without recommendation text; if full text is blocked, summarize only what is supported by abstract, metadata, PMC, or accessible supplements.
-- Writing: use cautious wording for heterogeneous, low-quality, or indirect evidence; do not turn absence of evidence into harm, or mechanistic/animal results into clinical recommendations; explicitly name limits such as pilots, open-label studies, exploratory biomarker work, or poor-quality meta-analyses.
-- Treat `./med-db` as the local archive; create it if missing and keep every used search result, abstract, metadata record, and source page updated.
-- Default archive command: `python3 ./pubmed-med-db.py --query '...' --archive-first N --validate`; use repeated `--pmid` flags for explicit PMIDs.
-- `pubmed-med-db.py` auto-creates `searches/`, `metadata/`, `abstracts/`, assigns the next `sNN-...json`, and syncs `med-db/README.md`.
-- Store searches as machine-readable JSON, abstracts as plain text, use stable `pmid-<id>-<slug>` filenames, and keep `med-db/README.md` indexed.
-- Run `python3 ./med-db-validate.py` after structural changes and before relying on the local archive; it checks required directories, empty files, JSON validity, metadata/abstract pairing, contiguous search numbering, and README consistency.
+- Keep standalone scripts single-purpose and lightweight. Avoid introducing large framework dependencies when standard shell or small scripting-library solutions are enough.
+- Preserve safety prompts and obviousness for scripts with destructive or privacy-related behavior.
+- For converters, scrapers, and text-processing utilities, prefer deterministic input/output behavior over cleverness.
+- If a utility already has a narrow platform assumption baked in, do not silently broaden or change that assumption without the user's request.
