@@ -432,7 +432,7 @@ function installCommandlineBasics() {
 function installSystemUtils() {
   echo "[UBUNTU SETUP] Install basic system utilities..."
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
-    sudo apt install -y keepass2
+    sudo apt install -y keepassxc-minimal
   fi
   sudo apt install -y file-roller gparted usb-creator-gtk
 
@@ -1467,8 +1467,8 @@ function installGit() {
     git lfs install
 
     installRust
-    sudo apt install -y ripgrep fd-find bat git-delta eza
-    cargo install watchexec-cli difftastic
+    sudo apt install -y ripgrep fd-find git-delta eza
+    cargo install bat watchexec-cli difftastic
 
     # shellcheck disable=SC2016
     local gitUtilsAliases='# use eza as ls-replacement with icons and details
@@ -1525,10 +1525,10 @@ function installDevTools() {
   installVsCode
 
   # install cli tools frequently used by AI agents
-  sudo apt install -y jq yq xq miller csvkit \
-    ripgrep fzf fd-find bat eza sd tokei hyperfine du-dust duf procs xh git-delta \
+  sudo apt install -y jq yq xq miller csvkit html2text \
+    ripgrep fzf fd-find eza sd tokei hyperfine du-dust duf procs xh git-delta \
     ripgrep-all poppler-utils tesseract-ocr
-  cargo install watchexec-cli difftastic ast-grep
+  cargo install bat watchexec-cli difftastic ast-grep
 
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
     installJava
