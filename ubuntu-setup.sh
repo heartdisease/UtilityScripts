@@ -425,7 +425,7 @@ function installCommandlineBasics() {
     net-tools plocate rhash pwgen \
     unzip zstd tar bzip2 xz-utils brotli rar unrar p7zip-full \
     ffmpeg imagemagick optipng pdftk-java libimage-exiftool-perl \
-    texlive-latex-recommended texlive-extra-utils \
+    texlive-latex-base texlive-latex-recommended texlive-fonts-recommended texlive-latex-extra texlive-extra-utils texlive-xetex \
     fish yt-dlp
 }
 
@@ -1527,7 +1527,7 @@ function installDevTools() {
   # install cli tools frequently used by AI agents
   sudo apt install -y jq yq xq miller csvkit html2text \
     ripgrep fzf fd-find eza sd tokei hyperfine du-dust duf procs xh git-delta \
-    ripgrep-all poppler-utils tesseract-ocr
+    ripgrep-all groff poppler-utils tesseract-ocr mupdf mupdf-tools
   cargo install bat watchexec-cli difftastic ast-grep
 
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
