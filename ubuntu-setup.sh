@@ -160,7 +160,9 @@ function configureGnomeSettings() {
   echo "[UBUNTU SETUP] Adjust GNOME desktop settings..."
   applyGsetting org.gnome.desktop.privacy search-history false
   applyGsetting org.gnome.desktop.privacy remember-app-usage false
-  applyGsetting org.gnome.desktop.interface clock-format 24h
+  applyGsetting org.gnome.desktop.privacy send-software-usage-stats false
+  applyGsetting org.gnome.desktop.interface clock-format '24h'
+  applyGsetting org.gnome.desktop.calendar week-start-day 'monday'
 
   echo "[UBUNTU SETUP] Adjust GNOME user settings for Nautilus..."
   applyGsetting org.gnome.nautilus.preferences default-sort-order 'type'
