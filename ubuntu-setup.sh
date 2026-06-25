@@ -424,11 +424,10 @@ function installEssentials() {
 function installCommandlineBasics() {
   echo "[UBUNTU SETUP] Install basic command line utilities..."
   sudo apt install -y libsecret-tools mesa-utils \
-    net-tools plocate rhash pwgen \
+    fish net-tools plocate rhash pwgen \
     unzip zstd tar bzip2 xz-utils brotli rar unrar p7zip-full \
     ffmpeg imagemagick optipng pdftk-java libimage-exiftool-perl \
-    texlive-latex-base texlive-latex-recommended texlive-fonts-recommended texlive-latex-extra texlive-extra-utils texlive-xetex \
-    fish yt-dlp
+    texlive-latex-base texlive-latex-recommended texlive-fonts-recommended texlive-latex-extra texlive-extra-utils texlive-xetex
 }
 
 function installSystemUtils() {
@@ -1530,6 +1529,7 @@ function installDevTools() {
   sudo apt install -y jq yq xq miller csvkit html2text \
     ripgrep fzf fd-find eza sd tokei hyperfine du-dust duf procs xh git-delta \
     ripgrep-all groff poppler-utils tesseract-ocr mupdf mupdf-tools
+  uv tool install 'yt-dlp[default,curl-cffi]'
   cargo install bat watchexec-cli difftastic ast-grep
 
   if [[ "${UBUNTU_SETUP_LENAS_SETUP:-}" == "1" ]]; then
@@ -1623,10 +1623,18 @@ function startUbuntuSetup() {
 
   sudo snap refresh
 
-  flatpak uninstall -y --unused
-  flatpak update -y --noninteractive
+  if command -v flatpak &>/dev/null; then
+    flatpak uninstall -y --unused
+    flatpak update -y --noninteractive
+  fi
 
-  cargo install-update --all
+  if command -v uv &>/dev/null; then
+    uv tool upgrade --all
+  fi
+
+  if command -v cargo &>/dev/null; then
+    cargo install-update --all
+  fi
 
   echo "[UBUNTU SETUP] Setup complete!"
   exit 0
