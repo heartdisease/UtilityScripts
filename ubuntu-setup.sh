@@ -1329,6 +1329,18 @@ function installClaudeCode() {
   "env": {}
 }' | tee ~/.claude/settings.json
     fi
+
+    installNodeJs
+    npm install -g typescript-language-server typescript
+
+    installPython
+    uv tool install python-lsp-server
+
+    installRust
+    cargo install lean-ctx
+    lean-ctx onboard
+
+    #cargo install --git https://github.com/rtk-ai/rtk
   else
     echo "[UBUNTU SETUP] Claude Code is already installed."
   fi
@@ -1364,17 +1376,17 @@ function installNodeJs() {
     fnm install 24 --corepack-enabled
     fnm use 24
     npm config set min-release-age 3
-    npm i -g rimraf
+    npm install -g npm@latest pnpm@latest rimraf@latest corepack@latest
     pnpm config set minimum-release-age 4320 --global
 
-    fnm install 25
-    fnm use 25
+    fnm install 26
+    fnm use 26
     npm config set min-release-age 3
-    npm i -g pnpm rimraf corepack
+    npm install -g npm@latest pnpm@latest rimraf@latest corepack@latest
     pnpm config set minimum-release-age 4320 --global
     corepack enable
 
-    fnm default 24
+    fnm default 26
     fnm use default
 
     # shellcheck disable=SC2016
@@ -1636,6 +1648,9 @@ function startUbuntuSetup() {
     cargo install-update --all
   fi
 
+  sudo fwupdmgr refresh --force
+  sudo fwupdmgr update
+
   echo "[UBUNTU SETUP] Setup complete!"
   exit 0
 }
@@ -1755,8 +1770,8 @@ if [[ "${UBUNTU_SETUP_INSTALL_LOCAL_AI:-}" == "1" ]]; then
   else
     installNodeJs
     #installOpenCode
-    #installClaudeCode
-    installLlamaCpp
+    installClaudeCode
+    #installLlamaCpp
     #installOllama
   fi
 fi
