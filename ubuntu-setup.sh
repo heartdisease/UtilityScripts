@@ -333,12 +333,12 @@ function reconfigureVsCode() {
     installNodeJs
   fi
 
-  fnm use 25
+  fnm use 26
   nodePath="$FNM_DIR/node-versions/$(fnm current)/installation/bin/node"
   fnm use default
 
   if ! [ -x "$nodePath" ]; then
-    echo "Unexpected error: could not detect Node.js 24 executable!"
+    echo "Unexpected error: could not detect Node.js 26 executable!"
     echo "Abort."
     exit 1
   fi
@@ -380,6 +380,7 @@ function reconfigureVsCode() {
       jq '."editor.fontFamily" = "'\''SeriousShanns Nerd Font Mono'\'', '\''Droid Sans Mono'\'', monospace"' |
       jq '."github.copilot.nextEditSuggestions.enabled" = false' |
       jq '."terminal.integrated.defaultProfile.linux" = "fish"' |
+      jq '."terminal.integrated.gpuAcceleration" = "off"' |
       jq '."js/ts.tsserver.node.path" = "'"$nodePath"'"' |
       jq '."js/ts.tsserver.maxMemory" = 10240' |
       jq '."vsicons.dontShowNewVersionMessage" = true' |
@@ -403,6 +404,7 @@ function reconfigureVsCode() {
       jq '."editor.bracketPairColorization.independentColorPoolPerBracketType" = true' |
       jq '."github.copilot.nextEditSuggestions.enabled" = false' |
       jq '."terminal.integrated.defaultProfile.linux" = "fish"' |
+      jq '."terminal.integrated.gpuAcceleration" = "off"' |
       jq '."typescript.tsserver.nodePath" = "'"$nodePath"'"' |
       jq '."vsicons.dontShowNewVersionMessage" = true' |
       jq '."window.zoomLevel" = 1' |
@@ -568,6 +570,18 @@ function installCustomFonts() {
 
   if [[ "${UBUNTU_SETUP_CUSTOM_FONT_INSTALLED:-}" == "1" ]]; then
     sudo fc-cache -fv
+  fi
+}
+
+function installFirefoxEsr() {
+  if ! command -v firefox-esr &>/dev/null; then
+    echo "[UBUNTU SETUP] Installing Firefox ESR..."
+    # from this guide: https://linuxconfig.org/how-to-install-firefox-without-snap-on-ubuntu-26-04
+    sudo snap remove --purge firefox
+    sudo add-apt-repository -y ppa:mozillateam/ppa
+    sudo apt install -y fonts-lyx firefox-esr
+  else
+    echo "[UBUNTU SETUP] Firefox ESR is already installed. Nothing to do."
   fi
 }
 
@@ -1329,18 +1343,6 @@ function installClaudeCode() {
   "env": {}
 }' | tee ~/.claude/settings.json
     fi
-
-    installNodeJs
-    npm install -g typescript-language-server typescript
-
-    installPython
-    uv tool install python-lsp-server
-
-    installRust
-    cargo install lean-ctx
-    lean-ctx onboard
-
-    #cargo install --git https://github.com/rtk-ai/rtk
   else
     echo "[UBUNTU SETUP] Claude Code is already installed."
   fi
@@ -1375,15 +1377,15 @@ function installNodeJs() {
 
     fnm install 24 --corepack-enabled
     fnm use 24
-    npm config set min-release-age 3
-    npm install -g npm@latest pnpm@latest rimraf@latest corepack@latest
-    pnpm config set minimum-release-age 4320 --global
+    #npm config set min-release-age 3
+    npm install -g --allow-scripts=esbuild npm@latest pnpm@latest typescript@latest tsx@latest rimraf@latest corepack@latest
+    #pnpm config set minimum-release-age 4320 --global
 
     fnm install 26
     fnm use 26
-    npm config set min-release-age 3
-    npm install -g npm@latest pnpm@latest rimraf@latest corepack@latest
-    pnpm config set minimum-release-age 4320 --global
+    #npm config set min-release-age 3
+    npm install -g --allow-scripts=esbuild npm@latest pnpm@latest typescript@latest tsx@latest rimraf@latest corepack@latest
+    #pnpm config set minimum-release-age 4320 --global
     corepack enable
 
     fnm default 26
@@ -1580,6 +1582,7 @@ function startUbuntuSetup() {
   # install snap packages
   installDiscord
   installSpotify
+  installFirefoxEsr
   installThunderbird
 
   # install flatpak packages
